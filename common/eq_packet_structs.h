@@ -4600,15 +4600,27 @@ struct BuffIcon_Struct
 
 struct ExpeditionInfo_Struct
 {
-/*000*/ uint32 max_players;
-/*004*/ char expedition_name[128];
-/*132*/ char leader_name[64];
+	/*000*/ uint32 clientid;
+	/*004*/ uint32 unknown004;
+	/*008*/ uint32 expedition_enabled;
+	/*012*/ uint32 max_players;
+	/*016*/ char expedition_name[128];
+	/*142*/ char leader_name[64];
+};
+
+struct ExpeditionAddPlayer_Struct
+{
+	/*000*/ uint32 unknown000;
+	/*004*/ uint32 unknown004;
+	/*008*/ char player_name[64];
 };
 
 struct ExpeditionJoinPrompt_Struct
 {
-/*000*/ char player_name[64];
-/*064*/ char expedition_name[64];
+	/*000*/ uint32 clientid;
+	/*004*/ uint32 unknown004;
+	/*008*/ char player_name[64];
+	/*072*/ char expedition_name[64];
 };
 
 struct ExpeditionExpireWarning

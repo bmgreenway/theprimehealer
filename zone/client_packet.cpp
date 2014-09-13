@@ -390,6 +390,12 @@ void MapOpcodes() {
 	ConnectedOpcodes[OP_OpenInventory] = &Client::Handle_OP_OpenInventory;
 	ConnectedOpcodes[OP_OpenContainer] = &Client::Handle_OP_OpenContainer;
 	ConnectedOpcodes[OP_ClientTimeStamp] = &Client::Handle_OP_ClientTimeStamp;
+	ConnectedOpcodes[OP_DzQuit] = &Client::Handle_OP_DzQuit;
+	ConnectedOpcodes[OP_DzAddPlayer] = &Client::Handle_OP_DzAddPlayer;
+	ConnectedOpcodes[OP_DzRemovePlayer] = &Client::Handle_OP_DzRemovePlayer;
+	ConnectedOpcodes[OP_DzMakeLeader] = &Client::Handle_OP_DzMakeLeader;
+	ConnectedOpcodes[OP_DzInviteRaid] = &Client::Handle_OP_DzInviteRaid;
+	ConnectedOpcodes[OP_DzInviteTask] = &Client::Handle_OP_DzInviteTask;
 }
 
 void ClearMappedOpcode(EmuOpcode op) {
@@ -2973,6 +2979,7 @@ void Client::Handle_OP_SpawnAppearance(const EQApplicationPacket *app)
 			SetAppearance(eaCrouching);
 			playeraction = 2;
 			SetFeigned(false);
+			ExpeditionInfoUpdate();
 		}
 		else if (sa->parameter == ANIM_DEATH) { // feign death too
 			SetAppearance(eaDead);
@@ -14062,4 +14069,67 @@ void Client::Handle_OP_OpenContainer(const EQApplicationPacket *app) {
 
 void Client::Handle_OP_ClientTimeStamp(const EQApplicationPacket *app) {
 	// handle as needed or ignore like we have been doing...
+}
+
+void Client::Handle_OP_DzQuit(const EQApplicationPacket *app) {
+	// packet size: 8
+	ExpeditionQuit();
+	this->Message(15, "Client::Handle_OP_DzQuit() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzAddPlayer(const EQApplicationPacket *app) {
+	// packet size: 72
+	this->Message(15, "Client::Handle_OP_DzAddPlayer() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+	
+	if (app->size != sizeof(ExpeditionAddPlayer_Struct)) {
+		this->Message(15, "Invalid size for OP_DZAddPlayer: Expected: %i, Got: %i", sizeof(ExpeditionAddPlayer_Struct), app->size);
+		LogFile->write(EQEMuLog::Error, "Invalid size for OP_DZAddPlayer: Expected: %i, Got: %i",
+			sizeof(ExpeditionAddPlayer_Struct), app->size);
+		return;
+	}
+
+	ExpeditionAddPlayer_Struct* dzadd = (ExpeditionAddPlayer_Struct*)app->pBuffer;
+	this->Message(15, "dzadd->unkown000 = %i", dzadd->unknown000);
+	this->Message(15, "dzadd->unknown004 = %i", dzadd->unknown004);
+	this->Message(15, "dzadd->player_name = %s", dzadd->player_name);
+
+	Mob *Invitee = entity_list.GetMob(dzadd->player_name);
+	if (Invitee == this) {
+		//need to check file for string on dzadd self
+		Message_StringID(clientMessageError, GROUP_INVITEE_SELF);
+		return;
+	}
+	if (Invitee) {
+		if (Invitee->IsClient()) {
+			Invitee->CastToClient()->ExpeditionAddPlayer(this);
+		}
+		else {
+			return;
+		}
+
+	}
+}
+
+void Client::Handle_OP_DzRemovePlayer(const EQApplicationPacket *app) {
+	// packet size: ? - grayed out
+
+	this->Message(15, "Client::Handle_OP_DzRemovePlayer() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzMakeLeader(const EQApplicationPacket *app) {
+	// packet size: ? - grayed out
+
+	this->Message(15, "Client::Handle_OP_DzMakeLeader() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzInviteRaid(const EQApplicationPacket *app) {
+	// packet size: ? - untested
+
+	this->Message(15, "Client::Handle_OP_DzInviteRaid() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzInviteTask(const EQApplicationPacket *app) {
+	// packet size: ? - untested
+
+	this->Message(15, "Client::Handle_OP_DzInviteTask() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
 }

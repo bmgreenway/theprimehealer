@@ -290,3 +290,9 @@
 	void Handle_OP_OpenInventory(const EQApplicationPacket *app);
 	void Handle_OP_OpenContainer(const EQApplicationPacket *app);
 	void Handle_OP_ClientTimeStamp(const EQApplicationPacket *app);
+	void Handle_OP_DzQuit(const EQApplicationPacket *app);
+	void Handle_OP_DzAddPlayer(const EQApplicationPacket *app);
+	void Handle_OP_DzRemovePlayer(const EQApplicationPacket *app);
+	void Handle_OP_DzMakeLeader(const EQApplicationPacket *app);
+	void Handle_OP_DzInviteRaid(const EQApplicationPacket *app);
+	void Handle_OP_DzInviteTask(const EQApplicationPacket *app);

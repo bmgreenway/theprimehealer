@@ -2559,8 +2559,8 @@ ENCODE(OP_DzExpeditionInfo)
 	ENCODE_LENGTH_EXACT(ExpeditionInfo_Struct);
 	SETUP_DIRECT_ENCODE(ExpeditionInfo_Struct, structs::ExpeditionInfo_Struct);
 	OUT(max_players);
-	eq->unknown004 = 785316192;
-	eq->unknown008 = 435601;
+	eq->unknown004 = emu->unknown004; //785316192;
+	eq->expedition_enabled = emu->expedition_enabled; //435601;
 	strcpy(eq->expedition_name, emu->expedition_name);
 	strcpy(eq->leader_name, emu->leader_name);
 	FINISH_ENCODE();
@@ -2668,6 +2668,9 @@ ENCODE(OP_DzJoinExpeditionConfirm)
 	SETUP_DIRECT_ENCODE(ExpeditionJoinPrompt_Struct, structs::ExpeditionJoinPrompt_Struct);
 	strcpy(eq->expedition_name, emu->expedition_name);
 	strcpy(eq->player_name, emu->player_name);
+	eq->clientid = emu->clientid;
+	//suspect expedition id
+	eq->unknown004 = emu->unknown004;
 	FINISH_ENCODE();
 }
 

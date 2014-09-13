@@ -6102,7 +6102,7 @@ void Client::CheckEmoteHail(Mob *target, const char* message)
 void Client::MarkSingleCompassLoc(float in_x, float in_y, float in_z, uint8 count)
 {
 
-	EQApplicationPacket* outapp = new EQApplicationPacket(OP_DzCompass, sizeof(ExpeditionInfo_Struct) + sizeof(ExpeditionCompassEntry_Struct) * count);
+	EQApplicationPacket* outapp = new EQApplicationPacket(OP_DzCompass, sizeof(ExpeditionInfo_Struct)+sizeof(ExpeditionCompassEntry_Struct)* count);
 	ExpeditionCompass_Struct *ecs = (ExpeditionCompass_Struct*)outapp->pBuffer;
 	//ecs->clientid = GetID();
 	ecs->count = count;
@@ -8292,7 +8292,57 @@ void Client::PlayMP3(const char* fname)
 	safe_delete(outapp);
 }
 
+void Client::ExpeditionInfoUpdate()
+{
+	EQApplicationPacket* outapp = new EQApplicationPacket(OP_DzExpeditionInfo, sizeof(ExpeditionInfo_Struct));
+	ExpeditionInfo_Struct *eis = (ExpeditionInfo_Struct*)outapp->pBuffer;
+	
+	strcpy(eis->expedition_name, "Expedition Info Test Entry");
+	strcpy(eis->leader_name, this->GetName());
+	eis->max_players = 54;
+	eis->clientid = this->GetID();
+	// unknown passed 0 and >0 values to no noticed effect
+	//eis->unknown004 = 1;
+
+	// enabled_max in titanium/SoF. 
+	//If you pass a 1 it pops open the Expedition window when populated packet is sent
+	//If you pass a 0 along with the rest of this data it populates all but max_players and the quit is disabled.
+	//but you /target someone and the rest of the buttons light up. also /dzadd works.
+	//if you do not pass it, it is the same as passing 0
+	eis->expedition_enabled = 1;
+	FastQueuePacket(&outapp);
+	safe_delete(outapp);
+}
+
+void Client::ExpeditionQuit() {
+	
+	EQApplicationPacket* outapp = new EQApplicationPacket(OP_DzExpeditionInfo, sizeof(ExpeditionInfo_Struct));
+	ExpeditionInfo_Struct *eis = (ExpeditionInfo_Struct*)outapp->pBuffer;
+	// send a 0 with no other info clears the current Expedition info from the info window
+	eis->expedition_enabled = 0;
+	FastQueuePacket(&outapp);
+	safe_delete(outapp);
+}
+
+void Client::ExpeditionAddPlayer(Client* inviter) {
+	this->Message(15, "/dzadd sent to you by %s", inviter->GetName());
+	inviter->Message(15, "You sent a /dzadd to %s", this->GetName());
+	EQApplicationPacket* outapp = new EQApplicationPacket(OP_DzJoinExpeditionConfirm, sizeof(ExpeditionJoinPrompt_Struct));
+	ExpeditionJoinPrompt_Struct *jec = (ExpeditionJoinPrompt_Struct*)outapp->pBuffer;
+	//does not seem to matter use dboth invitee and this
+	jec->clientid = inviter->GetID();
+	//shows up as expedition name in the invite pop up
+	strcpy(jec->expedition_name,"GetName from SQL by ID");
+	//shows up as the person inviteing you to the expedition
+	strcpy(jec->player_name, inviter->GetName());
+	// not seen yet
+	jec->unknown004 = 456;
+	FastQueuePacket(&outapp);
+	safe_delete(outapp);
+}
+
 void Client::ExpeditionSay(const char *str, int ExpID) {
+	//In use with perl based custom expedition mod from Akkadius
 	char errbuf[MYSQL_ERRMSG_SIZE];
 	char* query = 0;
 	MYSQL_RES *result;
