@@ -290,9 +290,24 @@
 	void Handle_OP_OpenInventory(const EQApplicationPacket *app);
 	void Handle_OP_OpenContainer(const EQApplicationPacket *app);
 	void Handle_OP_ClientTimeStamp(const EQApplicationPacket *app);
+
+	// Review for unneeded 'Dz' handlers after all clients are functional
 	void Handle_OP_DzQuit(const EQApplicationPacket *app);
+	void Handle_OP_DzListTimers(const EQApplicationPacket *app);
+	void Handle_OP_DzPlayerList(const EQApplicationPacket *app);
 	void Handle_OP_DzAddPlayer(const EQApplicationPacket *app);
 	void Handle_OP_DzRemovePlayer(const EQApplicationPacket *app);
+	void Handle_OP_DzSwapPlayer(const EQApplicationPacket *app);
 	void Handle_OP_DzMakeLeader(const EQApplicationPacket *app);
 	void Handle_OP_DzInviteRaid(const EQApplicationPacket *app);
 	void Handle_OP_DzInviteTask(const EQApplicationPacket *app);
+	void Handle_OP_DzJoinExpeditionConfirm(const EQApplicationPacket *app);
+	void Handle_OP_DzJoinExpeditionReply(const EQApplicationPacket *app);
+	void Handle_OP_DzExpeditionInfo(const EQApplicationPacket *app);
+	void Handle_OP_DzMemberStatus(const EQApplicationPacket *app);
+	void Handle_OP_DzLeaderStatus(const EQApplicationPacket *app);
+	void Handle_OP_DzExpeditionEndsWarning(const EQApplicationPacket *app);
+	void Handle_OP_DzExpeditionList(const EQApplicationPacket *app);
+	void Handle_OP_DzMemberList(const EQApplicationPacket *app);
+	void Handle_OP_DzCompass(const EQApplicationPacket *app);
+	void Handle_OP_DzChooseZone(const EQApplicationPacket *app);

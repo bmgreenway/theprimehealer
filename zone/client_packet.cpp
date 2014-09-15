@@ -390,12 +390,29 @@ void MapOpcodes() {
 	ConnectedOpcodes[OP_OpenInventory] = &Client::Handle_OP_OpenInventory;
 	ConnectedOpcodes[OP_OpenContainer] = &Client::Handle_OP_OpenContainer;
 	ConnectedOpcodes[OP_ClientTimeStamp] = &Client::Handle_OP_ClientTimeStamp;
+
+	// - Not all of these will be incoming opcodes and unused can be deleted once need is determined
+	// - Any changes in server structures will need to be translated in clients using the old ones (encode and decode)
+	// - We'll need to keep an eye out for any 'ConnectingOpcodes' as well
 	ConnectedOpcodes[OP_DzQuit] = &Client::Handle_OP_DzQuit;
+	ConnectedOpcodes[OP_DzListTimers] = &Client::Handle_OP_DzListTimers;
+	ConnectedOpcodes[OP_DzPlayerList] = &Client::Handle_OP_DzPlayerList;
 	ConnectedOpcodes[OP_DzAddPlayer] = &Client::Handle_OP_DzAddPlayer;
 	ConnectedOpcodes[OP_DzRemovePlayer] = &Client::Handle_OP_DzRemovePlayer;
+	ConnectedOpcodes[OP_DzSwapPlayer] = &Client::Handle_OP_DzSwapPlayer;
 	ConnectedOpcodes[OP_DzMakeLeader] = &Client::Handle_OP_DzMakeLeader;
 	ConnectedOpcodes[OP_DzInviteRaid] = &Client::Handle_OP_DzInviteRaid;
 	ConnectedOpcodes[OP_DzInviteTask] = &Client::Handle_OP_DzInviteTask;
+	ConnectedOpcodes[OP_DzJoinExpeditionConfirm] = &Client::Handle_OP_DzJoinExpeditionConfirm;
+	ConnectedOpcodes[OP_DzJoinExpeditionReply] = &Client::Handle_OP_DzJoinExpeditionReply;
+	ConnectedOpcodes[OP_DzExpeditionInfo] = &Client::Handle_OP_DzExpeditionInfo;
+	ConnectedOpcodes[OP_DzMemberStatus] = &Client::Handle_OP_DzMemberStatus;
+	ConnectedOpcodes[OP_DzLeaderStatus] = &Client::Handle_OP_DzLeaderStatus;
+	ConnectedOpcodes[OP_DzExpeditionEndsWarning] = &Client::Handle_OP_DzExpeditionEndsWarning;
+	ConnectedOpcodes[OP_DzExpeditionList] = &Client::Handle_OP_DzExpeditionList;
+	ConnectedOpcodes[OP_DzMemberList] = &Client::Handle_OP_DzMemberList;
+	ConnectedOpcodes[OP_DzCompass] = &Client::Handle_OP_DzCompass;
+	ConnectedOpcodes[OP_DzChooseZone] = &Client::Handle_OP_DzChooseZone;
 }
 
 void ClearMappedOpcode(EmuOpcode op) {
@@ -14071,10 +14088,23 @@ void Client::Handle_OP_ClientTimeStamp(const EQApplicationPacket *app) {
 	// handle as needed or ignore like we have been doing...
 }
 
+// Review for unneeded 'Dz' handlers after all clients are functional
 void Client::Handle_OP_DzQuit(const EQApplicationPacket *app) {
 	// packet size: 8
 	ExpeditionQuit();
 	this->Message(15, "Client::Handle_OP_DzQuit() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzListTimers(const EQApplicationPacket *app) {
+	// packet size: ?
+
+	this->Message(15, "Client::Handle_OP_DzListTimers() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzPlayerList(const EQApplicationPacket *app) {
+	// packet size: ?
+
+	this->Message(15, "Client::Handle_OP_DzPlayerList() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
 }
 
 void Client::Handle_OP_DzAddPlayer(const EQApplicationPacket *app) {
@@ -14111,25 +14141,91 @@ void Client::Handle_OP_DzAddPlayer(const EQApplicationPacket *app) {
 }
 
 void Client::Handle_OP_DzRemovePlayer(const EQApplicationPacket *app) {
-	// packet size: ? - grayed out
+	// packet size: ?
 
 	this->Message(15, "Client::Handle_OP_DzRemovePlayer() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
 }
 
+void Client::Handle_OP_DzSwapPlayer(const EQApplicationPacket *app) {
+	// packet size: ?
+
+	this->Message(15, "Client::Handle_OP_DzSwapPlayer() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
 void Client::Handle_OP_DzMakeLeader(const EQApplicationPacket *app) {
-	// packet size: ? - grayed out
+	// packet size: ?
 
 	this->Message(15, "Client::Handle_OP_DzMakeLeader() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
 }
 
 void Client::Handle_OP_DzInviteRaid(const EQApplicationPacket *app) {
-	// packet size: ? - untested
+	// packet size: ?
 
 	this->Message(15, "Client::Handle_OP_DzInviteRaid() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
 }
 
 void Client::Handle_OP_DzInviteTask(const EQApplicationPacket *app) {
-	// packet size: ? - untested
+	// packet size: ?
 
 	this->Message(15, "Client::Handle_OP_DzInviteTask() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzJoinExpeditionConfirm(const EQApplicationPacket *app) {
+	// packet size: ?
+
+	this->Message(15, "Client::Handle_OP_DzJoinExpeditionConfirm() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzJoinExpeditionReply(const EQApplicationPacket *app) {
+	// packet size: 80
+
+	this->Message(15, "Client::Handle_OP_DzJoinExpeditionReply() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzExpeditionInfo(const EQApplicationPacket *app) {
+	// packet size: ?
+
+	this->Message(15, "Client::Handle_OP_DzExpeditionInfo() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzMemberStatus(const EQApplicationPacket *app) {
+	// packet size: ?
+
+	this->Message(15, "Client::Handle_OP_DzMemberStatus() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzLeaderStatus(const EQApplicationPacket *app) {
+	// packet size: ?
+
+	this->Message(15, "Client::Handle_OP_DzLeaderStatus() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzExpeditionEndsWarning(const EQApplicationPacket *app) {
+	// packet size: ?
+
+	this->Message(15, "Client::Handle_OP_DzExpeditionEndsWarning() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzExpeditionList(const EQApplicationPacket *app) {
+	// packet size: ?
+
+	this->Message(15, "Client::Handle_OP_DzExpeditionList() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzMemberList(const EQApplicationPacket *app) {
+	// packet size: ?
+
+	this->Message(15, "Client::Handle_OP_DzMemberList() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzCompass(const EQApplicationPacket *app) {
+	// packet size: ?
+
+	this->Message(15, "Client::Handle_OP_DzCompass() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
+}
+
+void Client::Handle_OP_DzChooseZone(const EQApplicationPacket *app) {
+	// packet size: ?
+
+	this->Message(15, "Client::Handle_OP_DzChooseZone() - Client version: %i, packet size: %i", this->ClientVersion, app->size);
 }
