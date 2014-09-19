@@ -1797,7 +1797,7 @@ ENCODE(OP_DzExpeditionInfo)
 	ENCODE_LENGTH_EXACT(ExpeditionInfo_Struct);
 	SETUP_DIRECT_ENCODE(ExpeditionInfo_Struct, structs::ExpeditionInfo_Struct);
 	OUT(max_players);
-	eq->enabled_max = emu->expedition_enabled;
+	OUT(expedition_enabled);
 	strcpy(eq->expedition_name, emu->expedition_name);
 	strcpy(eq->leader_name, emu->leader_name);
 	FINISH_ENCODE();

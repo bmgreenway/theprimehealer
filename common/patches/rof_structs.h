@@ -4631,7 +4631,7 @@ struct ExpeditionInfo_Struct
 {
 /*000*/ uint32 clientid;
 /*004*/ uint32 unknown004;
-/*008*/ uint32 unknown008;
+/*008*/ uint32 expedition_enabled; // enabled_max? expedition_max?
 /*012*/ uint32 max_players;
 /*016*/ char expedition_name[128];
 /*142*/ char leader_name[64];
