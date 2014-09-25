@@ -479,7 +479,6 @@ ENCODE(OP_PlayerProfile) {
 	uint32 r;
 
 	eq->available_slots=0xffffffff;
-	memset(eq->unknown06284, 0xff, sizeof(eq->unknown06284));
 	memset(eq->unknown07284, 0xff, sizeof(eq->unknown07284));
 
 //	OUT(checksum);
@@ -538,7 +537,8 @@ ENCODE(OP_PlayerProfile) {
 	OUT(WIS);
 	OUT(face);
 //	OUT(unknown02264[47]);
-	OUT_array(spell_book, structs::MAX_PP_SPELLBOOK);
+	memset(eq->spell_book, 0xFF, sizeof(uint32)* structs::MAX_PP_SPELLBOOK);
+	OUT_array(spell_book, 480U);
 //	OUT(unknown4184[128]);
 	OUT_array(mem_spells, structs::MAX_PP_MEMSPELL);
 //	OUT(unknown04396[32]);
@@ -546,7 +546,7 @@ ENCODE(OP_PlayerProfile) {
 	OUT(gold);
 	OUT(silver);
 	OUT(copper);
-	OUT(platinum_cursor);
+	OUT(platinum_cursor); 
 	OUT(gold_cursor);
 	OUT(silver_cursor);
 	OUT(copper_cursor);
