@@ -188,6 +188,8 @@ bool Mob::SpellEffect(Mob* caster, uint16 spell_id, float partial)
 
 	if (!IsPowerDistModSpell(spell_id))
 		SetSpellPowerDistanceMod(0);
+		
+	bool SE_SpellTrigger_HasCast = false;	
 
 	// iterate through the effects in the spell
 	for (i = 0; i < EFFECT_COUNT; i++)
@@ -2729,6 +2731,25 @@ bool Mob::SpellEffect(Mob* caster, uint16 spell_id, float partial)
 				Message(10, "The power of your next illusion spell will flow to your grouped target in your place.");
 				break;
 			}
+			
+			case SE_ApplyEffect: {
+
+				if (caster && IsValidSpell(spells[spell_id].base2[i])){
+					
+					if(MakeRandomInt(0, 100) <= spells[spell_id].base[i])
+						caster->SpellFinished(spells[spell_id].base2[i], this, 10, 0, -1, spells[spell_id].ResistDiff);
+				}
+				break;
+			}
+			
+			case SE_SpellTrigger: {
+
+				if (!SE_SpellTrigger_HasCast) {
+					if (caster && caster->TrySpellTrigger(this, spell_id, i))
+						SE_SpellTrigger_HasCast = true;
+				}
+				break;
+			}
 
 			// Handled Elsewhere
 			case SE_ImmuneFleeing:
@@ -2839,8 +2860,6 @@ bool Mob::SpellEffect(Mob* caster, uint16 spell_id, float partial)
 			case SE_HealRate:
 			case SE_SkillDamageTaken:
 			case SE_FcSpellVulnerability:
-			case SE_SpellTrigger:
-			case SE_ApplyEffect:
 			case SE_FcTwincast:
 			case SE_DelayDeath:
 			case SE_CastOnFadeEffect:
@@ -3127,26 +3146,42 @@ snare has both of them negative, yet their range should work the same:
 
 		case 110:	// confirmed 2/6/04
 			//is there a reason we dont use updownsign here???
-			result = ubase + (caster_level / 5); break;
+			result = ubase + (caster_level / 6);
+			break;
 
 		case 111:
-            result = updownsign * (ubase + 6 * (caster_level - GetMinLevel(spell_id))); break;
+			result = updownsign * (ubase + 6 * (caster_level - 16));
+			break;
 		case 112:
-            result = updownsign * (ubase + 8 * (caster_level - GetMinLevel(spell_id))); break;
+			result = updownsign * (ubase + 8 * (caster_level - 24));
+			break;
 		case 113:
-            result = updownsign * (ubase + 10 * (caster_level - GetMinLevel(spell_id))); break;
+			result = updownsign * (ubase + 10 * (caster_level - 34));
+			break;
 		case 114:
-            result = updownsign * (ubase + 15 * (caster_level - GetMinLevel(spell_id))); break;
+			result = updownsign * (ubase + 15 * (caster_level - 44));
+			break;
 
-		//these formula were updated according to lucy 10/16/04
 		case 115:	// this is only in symbol of transal
-			result = ubase + 6 * (caster_level - GetMinLevel(spell_id)); break;
+			result = ubase;
+			if (caster_level > 15)
+				result += 7 * (caster_level - 15);
+			break;
 		case 116:	// this is only in symbol of ryltan
-            result = ubase + 8 * (caster_level - GetMinLevel(spell_id)); break;
+			result = ubase;
+			if (caster_level > 24)
+				result += 10 * (caster_level - 24);
+			break;
 		case 117:	// this is only in symbol of pinzarn
-            result = ubase + 12 * (caster_level - GetMinLevel(spell_id)); break;
+			result = ubase;
+			if (caster_level > 34)
+				result += 13 * (caster_level - 34);
+			break;
 		case 118:	// used in naltron and a few others
-            result = ubase + 20 * (caster_level - GetMinLevel(spell_id)); break;
+			result = ubase;
+			if (caster_level > 44)
+				result += 20 * (caster_level - 44);
+			break;
 
 		case 119:	// confirmed 2/6/04
 			result = ubase + (caster_level / 8); break;
@@ -3164,6 +3199,93 @@ snare has both of them negative, yet their range should work the same:
 		}
 		case 123:	// added 2/6/04
 			result = MakeRandomInt(ubase, abs(max));
+			break;
+
+		case 124:	// check sign
+			result = ubase;
+			if (caster_level > 50)
+				result += caster_level - 50;
+			break;
+
+		case 125:	// check sign
+			result = ubase;
+			if (caster_level > 50)
+				result += 2 * (caster_level - 50);
+			break;
+
+		case 126:	// check sign
+			result = ubase;
+			if (caster_level > 50)
+				result += 3 * (caster_level - 50);
+			break;
+
+		case 127:	// check sign
+			result = ubase;
+			if (caster_level > 50)
+				result += 4 * (caster_level - 50);
+			break;
+
+		case 128:	// check sign
+			result = ubase;
+			if (caster_level > 50)
+				result += 5 * (caster_level - 50);
+			break;
+
+		case 129:	// check sign
+			result = ubase;
+			if (caster_level > 50)
+				result += 10 * (caster_level - 50);
+			break;
+
+		case 130:	// check sign
+			result = ubase;
+			if (caster_level > 50)
+				result += 15 * (caster_level - 50);
+			break;
+
+		case 131:	// check sign
+			result = ubase;
+			if (caster_level > 50)
+				result += 20 * (caster_level - 50);
+			break;
+
+		case 132:	// check sign
+			result = ubase;
+			if (caster_level > 50)
+				result += 25 * (caster_level - 50);
+			break;
+
+		case 137:	// used in berserker AA desperation
+			result = ubase - (ubase * (GetHPRatio() / 100.0f));
+			break;
+
+		case 138: { // unused on live?
+			int maxhps = GetMaxHP() / 2;
+			if (GetHP() <= maxhps)
+				result = -(ubase * GetHP() / maxhps);
+			else
+				result = -ubase;
+			break;
+		}
+
+		case 139:	// check sign
+			result = ubase + (caster_level > 30 ? (caster_level - 30) / 2 : 0);
+			break;
+
+		case 140:	// check sign
+			result = ubase + (caster_level > 30 ? caster_level - 30 : 0);
+			break;
+
+		case 141:	// check sign
+			result = ubase + (caster_level > 30 ? (3 * caster_level - 90) / 2 : 0);
+			break;
+
+		case 142:	// check sign
+			result = ubase + (caster_level > 30 ? 2 * caster_level - 60 : 0);
+			break;
+
+		case 143:	// check sign
+			result = ubase + (3 * caster_level / 4);
 			break;
 
 		//these are used in stacking effects... formula unknown
@@ -5495,28 +5617,29 @@ void Mob::CheckNumHitsRemaining(uint8 type, uint32 buff_slot, uint16 spell_id)
 }
 
 //for some stupid reason SK procs return theirs one base off...
-uint16 Mob::GetProcID(uint16 spell_id, uint8 effect_index) {
+uint16 Mob::GetProcID(uint16 spell_id, uint8 effect_index)
+{
+	if (!RuleB(Spells, SHDProcIDOffByOne)) // UF+ spell files
+		return spells[spell_id].base[effect_index];
+
+	// We should actually just be checking if the mob is SHD, but to not force
+	// custom servers to create new spells, we will still do this
 	bool sk = false;
 	bool other = false;
-	for(int x = 0; x < 16; x++)
-	{
-		if(x == 4){
-			if(spells[spell_id].classes[4] < 255)
+	for (int x = 0; x < 16; x++) {
+		if (x == 4) {
+			if (spells[spell_id].classes[4] < 255)
 				sk = true;
-		}
-		else{
-			if(spells[spell_id].classes[x] < 255)
+		} else {
+			if (spells[spell_id].classes[x] < 255)
 				other = true;
 		}
 	}
 
-	if(sk && !other)
-	{
-		return(spells[spell_id].base[effect_index] + 1);
-	}
-	else{
-		return(spells[spell_id].base[effect_index]);
-	}
+	if (sk && !other)
+		return spells[spell_id].base[effect_index] + 1;
+	else
+		return spells[spell_id].base[effect_index];
 }
 
 bool Mob::TryDivineSave()
@@ -6350,8 +6473,12 @@ void Mob::ResourceTap(int32 damage, uint16 spellid){
 			if (spells[spellid].max[i] && (damage > spells[spellid].max[i]))
 				damage = spells[spellid].max[i];
 
-			if (spells[spellid].base2[i] == 0)  //HP Tap
-				SetHP((GetHP()+ damage));
+			if (spells[spellid].base2[i] == 0){ //HP Tap
+				if (damage > 0)
+					HealDamage(damage);
+				else
+					Damage(this, -damage,0, SkillEvocation,false);
+			}
 
 			if (spells[spellid].base2[i] == 1)  //Mana Tap
 				SetMana(GetMana() + damage);

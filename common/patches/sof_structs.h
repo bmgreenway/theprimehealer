@@ -3556,7 +3556,7 @@ struct GMToggle_Struct {
 	uint32 toggle;
 };
 
-struct BuffFadeMsg_Struct {
+struct ColoredText_Struct {
 	uint32 color;
 	char msg[1]; //was 1
 /*0???*/ uint8  paddingXXX[3];          // always 0's
@@ -3993,7 +3993,7 @@ struct ExpeditionExpireWarning
 struct ExpeditionInfo_Struct
 {
 /*000*/ uint32 clientid;
-/*004*/ uint32 enabled_max;
+/*004*/ uint32 expedition_enabled; // enabled_max? expedition_max?
 /*008*/ uint32 max_players;
 /*012*/ char expedition_name[128];
 /*142*/ char leader_name[64];
