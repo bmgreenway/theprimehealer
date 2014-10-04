@@ -1423,7 +1423,7 @@ namespace RoF
 
 		OUT(lootee);
 		OUT(looter);
-		eq->slot_id = emu->slot_id + 1;
+		eq->slot_id = ServerToRoFCorpseSlot(emu->slot_id);
 		OUT(auto_loot);
 
 		FINISH_ENCODE();
@@ -4405,7 +4405,7 @@ namespace RoF
 
 		IN(lootee);
 		IN(looter);
-		emu->slot_id = eq->slot_id - 1;
+		emu->slot_id = RoFToServerCorpseSlot(eq->slot_id);
 		IN(auto_loot);
 
 		FINISH_DIRECT_DECODE();
@@ -4671,6 +4671,7 @@ namespace RoF
 			slot_id = legacy::SLOT_TRADESKILL;	// 1000
 		}
 		emu->container_slot = slot_id;
+		emu->guildtribute_slot = RoFToServerSlot(eq->guildtribute_slot); // this should only return INVALID_INDEX until implemented -U
 
 		FINISH_DIRECT_DECODE();
 	}
@@ -5405,6 +5406,7 @@ namespace RoF
 	static inline uint32 ServerToRoFCorpseSlot(uint32 ServerCorpse)
 	{
 		//uint32 RoFCorpse;
+		return (ServerCorpse + 1);
 	}
 
 	static inline uint32 RoFToServerSlot(structs::ItemSlotStruct RoFSlot)
@@ -5498,6 +5500,10 @@ namespace RoF
 		ServerSlot = TempSlot;
 		}*/
 
+		else if (RoFSlot.SlotType == maps::MapGuildTribute) {
+			ServerSlot = INVALID_INDEX;
+		}
+
 		_log(NET__ERROR, "Convert RoF Slots: Type %i, Unk2 %i, Main %i, Sub %i, Aug %i, Unk1 %i to Server Slot %i", RoFSlot.SlotType, RoFSlot.Unknown02, RoFSlot.MainSlot, RoFSlot.SubSlot, RoFSlot.AugSlot, RoFSlot.Unknown01, ServerSlot);
 
 		return ServerSlot;
@@ -5541,6 +5547,7 @@ namespace RoF
 	static inline uint32 RoFToServerCorpseSlot(uint32 RoFCorpse)
 	{
 		//uint32 ServerCorpse;
+		return (RoFCorpse - 1);
 	}
 }
 // end namespace RoF

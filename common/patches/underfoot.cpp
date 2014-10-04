@@ -1234,7 +1234,7 @@ namespace Underfoot
 
 		OUT(lootee);
 		OUT(looter);
-		eq->slot_id = emu->slot_id + 1;
+		eq->slot_id = ServerToUnderFootCorpseSlot(emu->slot_id);
 		OUT(auto_loot);
 
 		FINISH_ENCODE();
@@ -3294,7 +3294,7 @@ namespace Underfoot
 
 		IN(lootee);
 		IN(looter);
-		emu->slot_id = eq->slot_id - 1;
+		emu->slot_id = UnderfootToServerCorpseSlot(eq->slot_id);
 		IN(auto_loot);
 
 		FINISH_DIRECT_DECODE();
@@ -3472,6 +3472,7 @@ namespace Underfoot
 		SETUP_DIRECT_DECODE(NewCombine_Struct, structs::NewCombine_Struct);
 
 		emu->container_slot = UnderfootToServerSlot(eq->container_slot);
+		IN(guildtribute_slot);
 
 		FINISH_DIRECT_DECODE();
 	}
@@ -4020,6 +4021,7 @@ namespace Underfoot
 	static inline uint32 ServerToUnderFootCorpseSlot(uint32 ServerCorpse)
 	{
 		//uint32 UnderfootCorpse;
+		return (ServerCorpse + 1);
 	}
 
 	static inline uint32 UnderfootToServerSlot(uint32 UnderfootSlot)
@@ -4045,6 +4047,7 @@ namespace Underfoot
 	static inline uint32 UnderfootToServerCorpseSlot(uint32 UnderfootCorpse)
 	{
 		//uint32 ServerCorpse;
+		return (UnderfootCorpse - 1);
 	}
 }
 // end namespace Underfoot
