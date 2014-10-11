@@ -8281,19 +8281,23 @@ void Client::ExpeditionQuit() {
 	safe_delete(outapp);
 }
 
+// if only inviter->GetName end up in use, change this to just take a name string instead of client object
 void Client::ExpeditionAddPlayer(Client* inviter) {
+	//only for initial testing. remove before commit.
 	this->Message(15, "/dzadd sent to you by %s", inviter->GetName());
 	inviter->Message(15, "You sent a /dzadd to %s", this->GetName());
+	//pop up message on screen of player being invited to join the expedition
 	EQApplicationPacket* outapp = new EQApplicationPacket(OP_DzJoinExpeditionConfirm, sizeof(ExpeditionJoinPrompt_Struct));
 	ExpeditionJoinPrompt_Struct *jec = (ExpeditionJoinPrompt_Struct*)outapp->pBuffer;
-	//does not seem to matter use dboth invitee and this
+	//does not seem to matter used both inviter and this
+	//need to try passing 0 and not populating at all.
 	jec->clientid = inviter->GetID();
 	//shows up as expedition name in the invite pop up
 	strcpy(jec->expedition_name,"GetName from SQL by ID");
-	//shows up as the person inviteing you to the expedition
+	//shows up as the person inviting you to the expedition
 	strcpy(jec->player_name, inviter->GetName());
-	// not seen yet
-	jec->unknown004 = 456;
+	//dummy value to see if I can locate it.
+	jec->unknown004 = 0;
 	FastQueuePacket(&outapp);
 	safe_delete(outapp);
 }

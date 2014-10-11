@@ -5438,6 +5438,7 @@ void Client::Handle_OP_DzAddPlayer(const EQApplicationPacket *app)
 	this->Message(15, "dzadd->unknown004 = %i", dzadd->unknown004);
 	this->Message(15, "dzadd->player_name = %s", dzadd->player_name);
 	
+	//player_name is the person targeted if using GUI or the name after /dzadd 
 	Mob *Invitee = entity_list.GetMob(dzadd->player_name);
 	if (Invitee == this) {
 		//need to check file for string on dzadd self
@@ -5445,7 +5446,9 @@ void Client::Handle_OP_DzAddPlayer(const EQApplicationPacket *app)
 		return;
 	}
 	if (Invitee) {
+		// Make sure the person being invited is a client
 		if (Invitee->IsClient()) {
+			// send the invite packet to the Invitee with the inviter (this) passed.
 			Invitee->CastToClient()->ExpeditionAddPlayer(this);
 		}
 		else {
