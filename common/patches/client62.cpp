@@ -1038,6 +1038,7 @@ namespace Client62
 		IN(face);
 		IN(eyecolor1);
 		IN(eyecolor2);
+		IN(tutorial);
 
 		FINISH_DIRECT_DECODE();
 	}
@@ -1234,6 +1235,7 @@ namespace Client62
 		int i;
 		uint32 sub_length;
 
+		// not sure if 6.2 has a recast timer timestamp field..but, something seems amiss between this and Ti's ordering
 		MakeAnyLenString(&instance,
 			"%i|%i|%i|%i|%i|%i|%i|%i|%i|%i|",
 			stackable ? charges : 1,

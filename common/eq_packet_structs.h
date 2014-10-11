@@ -534,7 +534,7 @@ struct SpellBuffFade_Struct {
 /*007*/	uint8 unknown7;
 /*008*/	uint32 spellid;
 /*012*/	uint32 duration;
-/*016*/	uint32 unknown016;
+/*016*/	uint32 num_hits;
 /*020*/	uint32 unknown020;	//prolly global player ID
 /*024*/	uint32 slotid;
 /*028*/	uint32 bufffade;
@@ -689,7 +689,7 @@ struct CharCreate_Struct
 /*0076*/	uint32	drakkin_heritage;	// added for SoF
 /*0080*/	uint32	drakkin_tattoo;		// added for SoF
 /*0084*/	uint32	drakkin_details;	// added for SoF
-/*0088*/
+/*0088*/	uint32	tutorial;
 };
 
 /*
@@ -4602,11 +4602,13 @@ struct BuffIconEntry_Struct
 	uint32 buff_slot;
 	uint32 spell_id;
 	uint32 tics_remaining;
+	uint32 num_hits;
 };
 
 struct BuffIcon_Struct
 {
 	uint32 entity_id;
+	uint8  all_buffs;
 	uint16 count;
 	BuffIconEntry_Struct entries[0];
 };

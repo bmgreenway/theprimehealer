@@ -376,6 +376,7 @@ namespace RoF
 		OUT(duration);
 		eq->playerId = 0x7cde;
 		OUT(slotid);
+		OUT(num_hits);
 		if (emu->bufffade == 1)
 			eq->bufffade = 1;
 		else
@@ -414,7 +415,7 @@ namespace RoF
 
 		__packet->WriteUInt32(emu->entity_id);
 		__packet->WriteUInt32(0);		// PlayerID ?
-		__packet->WriteUInt8(1);			// 1 indicates all buffs on the player (0 to add or remove a single buff)
+		__packet->WriteUInt8(emu->all_buffs);			// 1 indicates all buffs on the player (0 to add or remove a single buff)
 		__packet->WriteUInt16(emu->count);
 
 		for (uint16 i = 0; i < emu->count; ++i)
@@ -429,10 +430,10 @@ namespace RoF
 			__packet->WriteUInt32(buffslot);
 			__packet->WriteUInt32(emu->entries[i].spell_id);
 			__packet->WriteUInt32(emu->entries[i].tics_remaining);
-			__packet->WriteUInt32(0); // Unknown
+			__packet->WriteUInt32(emu->entries[i].num_hits); // Unknown
 			__packet->WriteString("");
 		}
-		__packet->WriteUInt8(0); // Unknown
+		__packet->WriteUInt8(!emu->all_buffs); // Unknown
 
 		FINISH_ENCODE();
 	}
@@ -2627,7 +2628,7 @@ namespace RoF
 		else
 			eq->window = emu->window;
 		OUT(type);
-		eq->invslot = 0; // Set to hard 0 since it's not required for the structure to work
+		OUT(invslot);
 		strn0cpy(eq->txtfile, emu->booktext, sizeof(eq->txtfile));
 
 		FINISH_ENCODE();
@@ -4035,12 +4036,7 @@ namespace RoF
 		IN(race);
 		IN(class_);
 		IN(deity);
-
-		if (RuleB(World, EnableTutorialButton) && eq->tutorial)
-			emu->start_zone = RuleI(World, TutorialZoneID);
-		else
-			emu->start_zone = eq->start_zone;
-
+		IN(start_zone);
 		IN(haircolor);
 		IN(beard);
 		IN(beardcolor);
@@ -4058,7 +4054,7 @@ namespace RoF
 		IN(WIS);
 		IN(INT);
 		IN(CHA);
-		//IN(tutorial);
+		IN(tutorial);
 
 		FINISH_DIRECT_DECODE();
 	}
@@ -4496,7 +4492,7 @@ namespace RoF
 		SETUP_DIRECT_DECODE(BookRequest_Struct, structs::BookRequest_Struct);
 
 		IN(type);
-		emu->invslot = 0; // Set to hard 0 since it's not required for the structure to work
+		IN(invslot);
 		emu->window = (uint8)eq->window;
 		strn0cpy(emu->txtfile, eq->txtfile, sizeof(emu->txtfile));
 

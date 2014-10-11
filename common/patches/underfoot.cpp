@@ -330,6 +330,7 @@ namespace Underfoot
 		OUT(duration);
 		OUT(slotid);
 		OUT(bufffade);	// Live (October 2011) sends a 2 rather than 0 when a buff is created, but it doesn't seem to matter.
+		OUT(num_hits);
 		eq->unknown008 = 1.0f;
 
 		FINISH_ENCODE();
@@ -344,14 +345,10 @@ namespace Underfoot
 		__packet->pBuffer = new unsigned char[sz];
 		memset(__packet->pBuffer, 0, sz);
 
-		uchar *ptr = __packet->pBuffer;
-		*((uint32*)ptr) = emu->entity_id;
-		ptr += sizeof(uint32);
-		ptr += sizeof(uint32);
-		*((uint8*)ptr) = 1;
-		ptr += sizeof(uchar);
-		*((uint16*)ptr) = emu->count;
-		ptr += sizeof(uint16);
+		__packet->WriteUInt32(emu->entity_id);
+		__packet->WriteUInt32(0);
+		__packet->WriteUInt8(emu->all_buffs); // 1 = all buffs, 0 = 1 buff
+		__packet->WriteUInt16(emu->count);
 
 		for (uint16 i = 0; i < emu->count; ++i)
 		{
@@ -365,15 +362,13 @@ namespace Underfoot
 				buffslot += 14;
 			}
 
-			*((uint32*)ptr) = buffslot;
-			ptr += sizeof(uint32);
-			*((uint32*)ptr) = emu->entries[i].spell_id;
-			ptr += sizeof(uint32);
-			*((uint32*)ptr) = emu->entries[i].tics_remaining;
-			ptr += sizeof(uint32);
-			ptr += sizeof(uint32);
-			ptr += 1;
+			__packet->WriteUInt32(buffslot);
+			__packet->WriteUInt32(emu->entries[i].spell_id);
+			__packet->WriteUInt32(emu->entries[i].tics_remaining);
+			__packet->WriteUInt32(emu->entries[i].num_hits);
+			__packet->WriteString("");
 		}
+		__packet->WriteUInt8(!emu->all_buffs);
 
 		FINISH_ENCODE();
 		/*
@@ -3012,12 +3007,7 @@ namespace Underfoot
 		IN(hairstyle);
 		IN(gender);
 		IN(race);
-
-		if (RuleB(World, EnableTutorialButton) && eq->tutorial)
-			emu->start_zone = RuleI(World, TutorialZoneID);
-		else
-			emu->start_zone = eq->start_zone;
-
+		IN(start_zone);
 		IN(haircolor);
 		IN(deity);
 		IN(STR);
@@ -3030,6 +3020,7 @@ namespace Underfoot
 		IN(face);
 		IN(eyecolor1);
 		IN(eyecolor2);
+		IN(tutorial);
 		IN(drakkin_heritage);
 		IN(drakkin_tattoo);
 		IN(drakkin_details);
