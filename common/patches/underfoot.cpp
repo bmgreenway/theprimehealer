@@ -1125,6 +1125,20 @@ namespace Underfoot
 		FINISH_ENCODE();
 	}
 
+	ENCODE(OP_InspectBuffs)
+	{
+		ENCODE_LENGTH_EXACT(InspectBuffs_Struct);
+		SETUP_DIRECT_ENCODE(InspectBuffs_Struct, structs::InspectBuffs_Struct);
+
+		// we go over the internal 25 instead of the packet's since no entry is 0, which it will be already
+		for (int i = 0; i < BUFF_COUNT; i++) {
+			OUT(spell_id[i]);
+			OUT(tics_remaining[i]);
+		}
+
+		FINISH_ENCODE();
+	}
+
 	ENCODE(OP_InspectRequest)
 	{
 		ENCODE_LENGTH_EXACT(Inspect_Struct);
@@ -1927,6 +1941,29 @@ namespace Underfoot
 			add_member->flags[2] = in_add_member->flags[2];
 			add_member->flags[3] = in_add_member->flags[3];
 			add_member->flags[4] = in_add_member->flags[4];
+			dest->FastQueuePacket(&outapp);
+		}
+		else if (raid_gen->action == 35)
+		{
+			RaidMOTD_Struct *inmotd = (RaidMOTD_Struct *)__emu_buffer;
+			EQApplicationPacket *outapp = new EQApplicationPacket(OP_RaidUpdate, sizeof(structs::RaidMOTD_Struct) + strlen(inmotd->motd) + 1);
+			structs::RaidMOTD_Struct *outmotd = (structs::RaidMOTD_Struct *)outapp->pBuffer;
+
+			outmotd->general.action = inmotd->general.action;
+			strn0cpy(outmotd->general.player_name, inmotd->general.player_name, 64);
+			strn0cpy(outmotd->motd, inmotd->motd, strlen(inmotd->motd) + 1);
+			dest->FastQueuePacket(&outapp);
+		}
+		else if (raid_gen->action == 14 || raid_gen->action == 30)
+		{
+			RaidLeadershipUpdate_Struct *inlaa = (RaidLeadershipUpdate_Struct *)__emu_buffer;
+			EQApplicationPacket *outapp = new EQApplicationPacket(OP_RaidUpdate, sizeof(structs::RaidLeadershipUpdate_Struct));
+			structs::RaidLeadershipUpdate_Struct *outlaa = (structs::RaidLeadershipUpdate_Struct *)outapp->pBuffer;
+
+			outlaa->action = inlaa->action;
+			strn0cpy(outlaa->player_name, inlaa->player_name, 64);
+			strn0cpy(outlaa->leader_name, inlaa->leader_name, 64);
+			memcpy(&outlaa->raid, &inlaa->raid, sizeof(RaidLeadershipAA_Struct));
 			dest->FastQueuePacket(&outapp);
 		}
 		else
@@ -3367,15 +3404,41 @@ namespace Underfoot
 
 	DECODE(OP_RaidInvite)
 	{
-		DECODE_LENGTH_EXACT(structs::RaidGeneral_Struct);
-		SETUP_DIRECT_DECODE(RaidGeneral_Struct, structs::RaidGeneral_Struct);
+		DECODE_LENGTH_ATLEAST(structs::RaidGeneral_Struct);
 
-		strn0cpy(emu->leader_name, eq->leader_name, 64);
-		strn0cpy(emu->player_name, eq->player_name, 64);
-		IN(action);
-		IN(parameter);
+		// This is a switch on the RaidGeneral action
+		switch (*(uint32 *)__packet->pBuffer) {
+			case 35: { // raidMOTD
+				// we don't have a nice macro for this
+				structs::RaidMOTD_Struct *__eq_buffer = (structs::RaidMOTD_Struct *)__packet->pBuffer;
+				__eq_buffer->motd[1023] = '\0';
+				size_t motd_size = strlen(__eq_buffer->motd) + 1;
+				__packet->size = sizeof(RaidMOTD_Struct) + motd_size;
+				__packet->pBuffer = new unsigned char[__packet->size];
+				RaidMOTD_Struct *emu = (RaidMOTD_Struct *)__packet->pBuffer;
+				structs::RaidMOTD_Struct *eq = (structs::RaidMOTD_Struct *)__eq_buffer;
+				strn0cpy(emu->general.player_name, eq->general.player_name, 64);
+				strn0cpy(emu->motd, eq->motd, motd_size);
+				IN(general.action);
+				IN(general.parameter);
+				FINISH_DIRECT_DECODE();
+				break;
+			}
+			case 36: { // raidPlayerNote unhandled
+				break;
+			}
+			default: {
+				DECODE_LENGTH_EXACT(structs::RaidGeneral_Struct);
+				SETUP_DIRECT_DECODE(RaidGeneral_Struct, structs::RaidGeneral_Struct);
+				strn0cpy(emu->leader_name, eq->leader_name, 64);
+				strn0cpy(emu->player_name, eq->player_name, 64);
+				IN(action);
+				IN(parameter);
+				FINISH_DIRECT_DECODE();
+				break;
+			}
+		}
 
-		FINISH_DIRECT_DECODE();
 	}
 
 	DECODE(OP_ReadBook)

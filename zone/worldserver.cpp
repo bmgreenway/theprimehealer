@@ -1001,9 +1001,11 @@ void WorldServer::Process() {
 					char AssistName[64];
 					char PullerName[64];
 					char NPCMarkerName[64];
+					char mentoree_name[64];
+					int mentor_percent;
 					GroupLeadershipAA_Struct GLAA;
 					memset(ln, 0, 64);
-					strcpy(ln, database.GetGroupLeadershipInfo(group->GetID(), ln, MainTankName, AssistName, PullerName, NPCMarkerName, &GLAA));
+					strcpy(ln, database.GetGroupLeadershipInfo(group->GetID(), ln, MainTankName, AssistName, PullerName, NPCMarkerName, mentoree_name, &mentor_percent, &GLAA));
 					Client *lc = entity_list.GetClientByName(ln);
 					if(lc)
 						group->SetLeader(lc);
@@ -1013,6 +1015,7 @@ void WorldServer::Process() {
 					group->SetPuller(PullerName);
 					group->SetNPCMarker(NPCMarkerName);
 					group->SetGroupAAs(&GLAA);
+					group->SetGroupMentor(mentor_percent, mentoree_name);
 
 				}
 			}
@@ -1369,6 +1372,18 @@ void WorldServer::Process() {
 					}
 				}
 			}
+			break;
+		}
+
+		case ServerOP_RaidMOTD: {
+			ServerRaidMOTD_Struct *rmotd = (ServerRaidMOTD_Struct *)pack->pBuffer;
+			if (!zone)
+				break;
+			Raid *r = entity_list.GetRaidByID(rmotd->rid);
+			if (!r)
+				break;
+			r->SetRaidMOTD(std::string(rmotd->motd));
+			r->SendRaidMOTD();
 			break;
 		}
 

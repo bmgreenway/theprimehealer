@@ -256,6 +256,7 @@ void MapOpcodes()
 	ConnectedOpcodes[OP_GroupInvite] = &Client::Handle_OP_GroupInvite;
 	ConnectedOpcodes[OP_GroupInvite2] = &Client::Handle_OP_GroupInvite2;
 	ConnectedOpcodes[OP_GroupMakeLeader] = &Client::Handle_OP_GroupMakeLeader;
+	ConnectedOpcodes[OP_GroupMentor] = &Client::Handle_OP_GroupMentor;
 	ConnectedOpcodes[OP_GroupRoles] = &Client::Handle_OP_GroupRoles;
 	ConnectedOpcodes[OP_GroupUpdate] = &Client::Handle_OP_GroupUpdate;
 	ConnectedOpcodes[OP_GuildBank] = &Client::Handle_OP_GuildBank;
@@ -568,6 +569,7 @@ void Client::CompleteConnect()
 			raid = new Raid(raidid);
 			if (raid->GetID() != 0){
 				entity_list.AddRaid(raid, raidid);
+				raid->LoadLeadership(); // Recreating raid in new zone, get leadership from DB
 			}
 			else
 				raid = nullptr;
@@ -587,11 +589,22 @@ void Client::CompleteConnect()
 			raid->SendRaidAdd(GetName(), this);
 			raid->SendBulkRaid(this);
 			raid->SendGroupUpdate(this);
+			raid->SendRaidMOTD(this);
+			if (raid->IsLeader(this)) { // We're a raid leader, lets update just in case!
+				raid->UpdateRaidAAs();
+				raid->SendAllRaidLeadershipAA();
+			}
 			uint32 grpID = raid->GetGroup(GetName());
 			if (grpID < 12){
 				raid->SendRaidGroupRemove(GetName(), grpID);
 				raid->SendRaidGroupAdd(GetName(), grpID);
+				raid->CheckGroupMentor(grpID, this);
+				if (raid->IsGroupLeader(GetName())) { // group leader same thing!
+					raid->UpdateGroupAAs(raid->GetGroup(this));
+					raid->GroupUpdate(grpID, false);
+				}
 			}
+			raid->SendGroupLeadershipAA(this, grpID); // this may get sent an extra time ...
 			if (raid->IsLocked())
 				raid->SendRaidLockTo(this);
 		}
@@ -1427,6 +1440,22 @@ void Client::Handle_Connect_OP_ZoneEntry(const EQApplicationPacket *app)
 	database.LoadCharacterLeadershipAA(cid, &m_pp); /* Load Character Leadership AA's */
 	database.LoadCharacterTribute(cid, &m_pp); /* Load CharacterTribute */
 
+	/* Load AdventureStats */
+	AdventureStats_Struct as;
+	if(database.GetAdventureStats(cid, &as))
+	{
+		m_pp.ldon_wins_guk = as.success.guk;
+		m_pp.ldon_wins_mir = as.success.mir;
+		m_pp.ldon_wins_mmc = as.success.mmc;
+		m_pp.ldon_wins_ruj = as.success.ruj;
+		m_pp.ldon_wins_tak = as.success.tak;
+		m_pp.ldon_losses_guk = as.failure.guk;
+		m_pp.ldon_losses_mir = as.failure.mir;
+		m_pp.ldon_losses_mmc = as.failure.mmc;
+		m_pp.ldon_losses_ruj = as.failure.ruj;
+		m_pp.ldon_losses_tak = as.failure.tak;
+	}
+
 	/* Set item material tint */
 	for (int i = EmuConstants::MATERIAL_BEGIN; i <= EmuConstants::MATERIAL_END; i++)
 	if (m_pp.item_tint[i].rgb.use_tint == 1 || m_pp.item_tint[i].rgb.use_tint == 255)
@@ -1630,9 +1659,7 @@ void Client::Handle_Connect_OP_ZoneEntry(const EQApplicationPacket *app)
 			}
 		}	//else, somebody from our group is already here...
 
-		if (group)
-			group->UpdatePlayer(this);
-		else
+		if (!group)
 			database.SetGroupID(GetName(), 0, CharacterID());	//cannot re-establish group, kill it
 
 	}
@@ -1651,9 +1678,11 @@ void Client::Handle_Connect_OP_ZoneEntry(const EQApplicationPacket *app)
 			char AssistName[64];
 			char PullerName[64];
 			char NPCMarkerName[64];
+			char mentoree_name[64];
+			int mentor_percent;
 			GroupLeadershipAA_Struct GLAA;
 			memset(ln, 0, 64);
-			strcpy(ln, database.GetGroupLeadershipInfo(group->GetID(), ln, MainTankName, AssistName, PullerName, NPCMarkerName, &GLAA));
+			strcpy(ln, database.GetGroupLeadershipInfo(group->GetID(), ln, MainTankName, AssistName, PullerName, NPCMarkerName, mentoree_name, &mentor_percent, &GLAA));
 			Client *c = entity_list.GetClientByName(ln);
 			if (c)
 				group->SetLeader(c);
@@ -1663,6 +1692,7 @@ void Client::Handle_Connect_OP_ZoneEntry(const EQApplicationPacket *app)
 			group->SetPuller(PullerName);
 			group->SetNPCMarker(NPCMarkerName);
 			group->SetGroupAAs(&GLAA);
+			group->SetGroupMentor(mentor_percent, mentoree_name);
 
 			//group->NotifyMainTank(this, 1);
 			//group->NotifyMainAssist(this, 1);
@@ -1674,6 +1704,7 @@ void Client::Handle_Connect_OP_ZoneEntry(const EQApplicationPacket *app)
 				group->SendLeadershipAAUpdate();
 
 		}
+		group->UpdatePlayer(this);
 		LFG = false;
 	}
 
@@ -2509,11 +2540,8 @@ void Client::Handle_OP_AdventureStatsRequest(const EQApplicationPacket *app)
 	EQApplicationPacket* outapp = new EQApplicationPacket(OP_AdventureStatsReply, sizeof(AdventureStats_Struct));
 	AdventureStats_Struct *as = (AdventureStats_Struct*)outapp->pBuffer;
 
-	if (database.GetAdventureStats(CharacterID(), as->success.guk, as->success.mir, as->success.mmc, as->success.ruj,
-		as->success.tak, as->failure.guk, as->failure.mir, as->failure.mmc, as->failure.ruj, as->failure.tak))
+	if (database.GetAdventureStats(CharacterID(), as))
 	{
-		as->failure.total = as->failure.guk + as->failure.mir + as->failure.mmc + as->failure.ruj + as->failure.tak;
-		as->success.total = as->success.guk + as->success.mir + as->success.mmc + as->success.ruj + as->success.tak;
 		m_pp.ldon_wins_guk = as->success.guk;
 		m_pp.ldon_wins_mir = as->success.mir;
 		m_pp.ldon_wins_mmc = as->success.mmc;
@@ -5332,6 +5360,17 @@ void Client::Handle_OP_DoGroupLeadershipAbility(const EQApplicationPacket *app)
 		if (!Target || !Target->IsClient())
 			return;
 
+		if (IsRaidGrouped()) {
+			Raid *raid = GetRaid();
+			if (!raid)
+				return;
+			uint32 group_id = raid->GetGroup(this);
+			if (group_id > 11 || raid->GroupCount(group_id) < 3)
+				return;
+			Target->CastToClient()->InspectBuffs(this, raid->GetLeadershipAA(groupAAInspectBuffs, group_id));
+			return;
+		}
+
 		Group *g = GetGroup();
 
 		if (!g || (g->GroupCount() < 3))
@@ -5343,6 +5382,8 @@ void Client::Handle_OP_DoGroupLeadershipAbility(const EQApplicationPacket *app)
 	}
 
 	default:
+		LogFile->write(EQEMuLog::Debug, "Got unhandled OP_DoGroupLeadershipAbility Ability: %d Parameter: %d",
+				dglas->Ability, dglas->Parameter);
 		break;
 	}
 }
@@ -7015,6 +7056,42 @@ void Client::Handle_OP_GroupMakeLeader(const EQApplicationPacket *app)
 			DumpPacket(app);
 		}
 	}
+}
+
+void Client::Handle_OP_GroupMentor(const EQApplicationPacket *app)
+{
+	if (app->size != sizeof(GroupMentor_Struct)) {
+		LogFile->write(EQEMuLog::Error, "Wrong size: OP_GroupMentor, size=%i, expected %i", app->size, sizeof(GroupMentor_Struct));
+		DumpPacket(app);
+		return;
+	}
+	GroupMentor_Struct *gms = (GroupMentor_Struct *)app->pBuffer;
+	gms->name[63] = '\0';
+
+	if (IsRaidGrouped()) {
+		Raid *raid = GetRaid();
+		if (!raid)
+			return;
+		uint32 group_id = raid->GetGroup(this);
+		if (group_id > 11)
+			return;
+		if (strlen(gms->name))
+			raid->SetGroupMentor(group_id, gms->percent, gms->name);
+		else
+			raid->ClearGroupMentor(group_id);
+		return;
+	}
+
+	Group *group = GetGroup();
+	if (!group)
+		return;
+
+	if (strlen(gms->name))
+		group->SetGroupMentor(gms->percent, gms->name);
+	else
+		group->ClearGroupMentor();
+
+	return;
 }
 
 void Client::Handle_OP_GroupRoles(const EQApplicationPacket *app)
@@ -10777,10 +10854,23 @@ void Client::Handle_OP_PurchaseLeadershipAA(const EQApplicationPacket *app)
 		u->pointsleft = m_pp.group_leadership_points;
 	FastQueuePacket(&outapp);
 
-	Group *g = GetGroup();
-
 	// Update all group members with the new AA the leader has purchased.
-	if (g) {
+	if (IsRaidGrouped()) {
+		Raid *r = GetRaid();
+		if (!r)
+			return;
+		if (aaid >= raidAAMarkNPC) {
+			r->UpdateRaidAAs();
+			r->SendAllRaidLeadershipAA();
+		} else {
+			uint32 gid = r->GetGroup(this);
+			r->UpdateGroupAAs(gid);
+			r->GroupUpdate(gid, false);
+		}
+	} else if (IsGrouped()) {
+		Group *g = GetGroup();
+		if (!g)
+			return;
 		g->UpdateGroupAAs();
 		g->SendLeadershipAAUpdate();
 	}
@@ -10841,8 +10931,8 @@ void Client::Handle_OP_PVPLeaderBoardRequest(const EQApplicationPacket *app)
 
 void Client::Handle_OP_RaidCommand(const EQApplicationPacket *app)
 {
-	if (app->size != sizeof(RaidGeneral_Struct)) {
-		LogFile->write(EQEMuLog::Error, "Wrong size: OP_RaidCommand, size=%i, expected %i", app->size, sizeof(RaidGeneral_Struct));
+	if (app->size < sizeof(RaidGeneral_Struct)) {
+		LogFile->write(EQEMuLog::Error, "Wrong size: OP_RaidCommand, size=%i, expected at least %i", app->size, sizeof(RaidGeneral_Struct));
 		DumpPacket(app);
 		return;
 	}
@@ -11156,6 +11246,7 @@ void Client::Handle_OP_RaidCommand(const EQApplicationPacket *app)
 							if (r->members[x].GroupNumber == grp){
 								r->SetGroupLeader(ri->leader_name, false);
 								r->SetGroupLeader(r->members[x].membername);
+								r->UpdateGroupAAs(grp);
 								break;
 							}
 						}
@@ -11167,6 +11258,8 @@ void Client::Handle_OP_RaidCommand(const EQApplicationPacket *app)
 						if (strlen(r->members[x].membername) > 0 && strcmp(r->members[x].membername, r->members[i].membername) != 0)
 						{
 							r->SetRaidLeader(r->members[i].membername, r->members[x].membername);
+							r->UpdateRaidAAs();
+							r->SendAllRaidLeadershipAA();
 							break;
 						}
 					}
@@ -11220,6 +11313,7 @@ void Client::Handle_OP_RaidCommand(const EQApplicationPacket *app)
 									if (strcmp(ri->leader_name, r->members[x].membername) != 0 && strlen(ri->leader_name) > 0)
 									{
 										r->SetGroupLeader(r->members[x].membername);
+										r->UpdateGroupAAs(oldgrp);
 										Client *cgl = entity_list.GetClientByName(r->members[x].membername);
 										if (cgl){
 											r->SendRaidRemove(r->members[x].membername, cgl);
@@ -11247,8 +11341,10 @@ void Client::Handle_OP_RaidCommand(const EQApplicationPacket *app)
 							}
 						}
 					}
-					if (grpcount == 0)
+					if (grpcount == 0) {
 						r->SetGroupLeader(ri->leader_name);
+						r->UpdateGroupAAs(ri->parameter);
+					}
 
 					r->MoveMember(ri->leader_name, ri->parameter);
 					if (c){
@@ -11283,9 +11379,10 @@ void Client::Handle_OP_RaidCommand(const EQApplicationPacket *app)
 					r->SetGroupLeader(ri->leader_name, false);
 					for (int x = 0; x < MAX_RAID_MEMBERS; x++)
 					{
-						if (strlen(r->members[x].membername) > 0 && strcmp(r->members[x].membername, ri->leader_name) != 0)
+						if (r->members[x].GroupNumber == oldgrp && strlen(r->members[x].membername) > 0 && strcmp(r->members[x].membername, ri->leader_name) != 0)
 						{
 							r->SetGroupLeader(r->members[x].membername);
+							r->UpdateGroupAAs(oldgrp);
 							Client *cgl = entity_list.GetClientByName(r->members[x].membername);
 							if (cgl){
 								r->SendRaidRemove(r->members[x].membername, cgl);
@@ -11399,8 +11496,23 @@ void Client::Handle_OP_RaidCommand(const EQApplicationPacket *app)
 		{
 			if (strcmp(r->leadername, GetName()) == 0){
 				r->SetRaidLeader(GetName(), ri->leader_name);
+				r->UpdateRaidAAs();
+				r->SendAllRaidLeadershipAA();
 			}
 		}
+		break;
+	}
+
+	case RaidCommandSetMotd:
+	{
+		Raid *r = entity_list.GetRaidByClient(this);
+		if (!r)
+			break;
+		// we don't use the RaidGeneral here!
+		RaidMOTD_Struct *motd = (RaidMOTD_Struct *)app->pBuffer;
+		r->SetRaidMOTD(std::string(motd->motd));
+		r->SaveRaidMOTD();
+		r->SendRaidMOTDToWorld();
 		break;
 	}
 
@@ -13025,9 +13137,25 @@ void Client::Handle_OP_TargetCommand(const EQApplicationPacket *app)
 		if (nt)
 		{
 			SetTarget(nt);
-			if ((nt->IsClient() && !nt->CastToClient()->GetPVP()) ||
-				(nt->IsPet() && nt->GetOwner() && nt->GetOwner()->IsClient() && !nt->GetOwner()->CastToClient()->GetPVP()) ||
-				(nt->IsMerc() && nt->GetOwner() && nt->GetOwner()->IsClient() && !nt->GetOwner()->CastToClient()->GetPVP()))
+			bool inspect_buffs = false;
+			// rank 1 gives you ability to see NPC buffs in target window (SoD+)
+			if (nt->IsNPC()) {
+				if (IsRaidGrouped()) {
+					Raid *raid = GetRaid();
+					if (raid) {
+						uint32 gid = raid->GetGroup(this);
+						if (gid < 12 && raid->GroupCount(gid) > 2)
+							inspect_buffs = raid->GetLeadershipAA(groupAAInspectBuffs, gid);
+					}
+				} else {
+					Group *group = GetGroup();
+					if (group && group->GroupCount() > 2)
+						inspect_buffs = group->GetLeadershipAA(groupAAInspectBuffs);
+				}
+			}
+			if (nt == this || inspect_buffs || (nt->IsClient() && !nt->CastToClient()->GetPVP()) ||
+					(nt->IsPet() && nt->GetOwner() && nt->GetOwner()->IsClient() && !nt->GetOwner()->CastToClient()->GetPVP()) ||
+					(nt->IsMerc() && nt->GetOwner() && nt->GetOwner()->IsClient() && !nt->GetOwner()->CastToClient()->GetPVP()))
 				nt->SendBuffsToClient(this);
 		}
 		else

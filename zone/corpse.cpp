@@ -97,7 +97,7 @@ Corpse* Corpse::LoadFromDBData(uint32 in_dbid, uint32 in_charid, char* in_charna
 		for (unsigned int i=0; i < dbpcs->itemcount; i++) {
 			tmp = new ServerLootItem_Struct;
 			memcpy(tmp, &dbpcs->items[i], sizeof(player_lootitem::ServerLootItem_Struct));
-			tmp->lootslot = CorpseToServerSlot(tmp->lootslot); // temp hack until corpse blobs are removed
+			tmp->equipSlot = CorpseToServerSlot(tmp->equipSlot); // temp hack until corpse blobs are removed
 			itemlist.push_back(tmp);
 		}
 
@@ -148,7 +148,7 @@ Corpse* Corpse::LoadFromDBData(uint32 in_dbid, uint32 in_charid, char* in_charna
 		for (unsigned int i=0; i < dbpc->itemcount; i++) {
 			tmp = new ServerLootItem_Struct;
 			memcpy(tmp, &dbpc->items[i], sizeof(player_lootitem::ServerLootItem_Struct));
-			tmp->lootslot = CorpseToServerSlot(tmp->lootslot); // temp hack until corpse blobs are removed
+			tmp->equipSlot = CorpseToServerSlot(tmp->equipSlot); // temp hack until corpse blobs are removed
 			itemlist.push_back(tmp);
 		}
 
@@ -602,7 +602,7 @@ bool Corpse::Save() {
 	end = itemlist.end();
 	for(; cur != end; ++cur) {
 		ServerLootItem_Struct* item = *cur;
-		item->lootslot = ServerToCorpseSlot(item->lootslot); // temp hack until corpse blobs are removed
+		item->equipSlot = ServerToCorpseSlot(item->equipSlot); // temp hack until corpse blobs are removed
 		memcpy((char*) &dbpc->items[x++], (char*) item, sizeof(player_lootitem::ServerLootItem_Struct));
 	}
 
@@ -1071,6 +1071,10 @@ void Corpse::LootItem(Client* client, const EQApplicationPacket* app)
 	if(!loot_cooldown_timer.Check())
 	{
 		SendEndLootErrorPacket(client);
+		//unlock corpse for others
+		if (this->BeingLootedBy = client->GetID()) {
+			BeingLootedBy = 0xFFFFFFFF;
+		}
 		return;
 	}
 
@@ -1079,6 +1083,10 @@ void Corpse::LootItem(Client* client, const EQApplicationPacket* app)
 	{
 		client->Message(13, "You may not loot an item while you have an item on your cursor.");
 		SendEndLootErrorPacket(client);
+		//unlock corpse for others
+		if (this->BeingLootedBy = client->GetID()) {
+			BeingLootedBy = 0xFFFFFFFF;
+		}
 		return;
 	}
 
@@ -2092,7 +2100,7 @@ void Corpse::LoadPlayerCorpseDecayTime(uint32 dbid){
 **
 **	(Not all slot designations are valid to all clients..see <client>##_constants.h files for valid slot enumerations)
 */
-uint16 Corpse::ServerToCorpseSlot(uint16 server_slot)
+int16 Corpse::ServerToCorpseSlot(int16 server_slot)
 {
 	return server_slot; // temporary return
 
@@ -2128,7 +2136,7 @@ uint16 Corpse::ServerToCorpseSlot(uint16 server_slot)
 	*/
 }
 
-uint16 Corpse::CorpseToServerSlot(uint16 corpse_slot)
+int16 Corpse::CorpseToServerSlot(int16 corpse_slot)
 {
 	return corpse_slot; // temporary return
 
