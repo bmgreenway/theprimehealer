@@ -97,6 +97,7 @@ public:
 	const Beacon	*CastToBeacon() const;
 
 	inline const uint16& GetID() const { return id; }
+	inline const time_t& GetSpawnTimeStamp() const { return spawn_timestamp; }
 
 	virtual const char* GetName() { return ""; }
 	bool CheckCoordLosNoZLeaps(float cur_x, float cur_y, float cur_z, float trg_x, float trg_y, float trg_z, float perwalk=1);
@@ -112,6 +113,7 @@ protected:
 	uint32 pDBAsyncWorkID;
 private:
 	uint16 id;
+	time_t spawn_timestamp;
 };
 
 class EntityList
@@ -134,7 +136,7 @@ public:
 	Mob *GetMob(const char* name);
 	Mob *GetMobByNpcTypeID(uint32 get_id);
 	bool IsMobSpawnedByNpcTypeID(uint32 get_id);
-	Mob *GetTargetForVirus(Mob* spreader);
+	Mob *GetTargetForVirus(Mob* spreader, int range);
 	inline NPC *GetNPCByID(uint16 id)
 		{ return npc_list.count(id) ? npc_list.at(id) : nullptr; }
 	NPC *GetNPCByNPCTypeID(uint32 npc_id);
@@ -249,6 +251,8 @@ public:
 	void	RemoveAllLocalities();
 	void	RemoveAllRaids();
 	void	DestroyTempPets(Mob *owner);
+	int16	CountTempPets(Mob *owner);
+	void	AddTempPetsToHateList(Mob *owner, Mob* other, bool bFrenzy = false);
 	Entity *GetEntityMob(uint16 id);
 	Entity *GetEntityMerc(uint16 id);
 	Entity *GetEntityDoor(uint16 id);

@@ -15,17 +15,14 @@
 	along with this program; if not, write to the Free Software
 	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
-#include "../common/debug.h"
+
+#include <float.h>
 #include <iostream>
-#include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <float.h>
-#include <time.h>
-#include <math.h>
 
 #ifdef _WINDOWS
-#include <process.h>
 #define	snprintf	_snprintf
 #define	vsnprintf	_vsnprintf
 #else
@@ -33,31 +30,26 @@
 #include "../common/unix.h"
 #endif
 
-#include "masterentity.h"
+#include "../common/debug.h"
 #include "../common/features.h"
-#include "spawngroup.h"
-#include "spawn2.h"
-#include "zone.h"
-#include "worldserver.h"
-#include "npc.h"
-#include "net.h"
-#include "../common/seperator.h"
-#include "../common/packet_dump_file.h"
-#include "../common/eq_stream_factory.h"
-#include "../common/eq_stream.h"
-#include "../common/string_util.h"
-#include "zone_config.h"
-#include "../common/breakdowns.h"
-#include "map.h"
-#include "water_map.h"
-#include "object.h"
-#include "petitions.h"
-#include "pathing.h"
-#include "event_codes.h"
-#include "client_logs.h"
 #include "../common/rulesys.h"
+#include "../common/seperator.h"
+#include "../common/string_util.h"
+#include "client_logs.h"
 #include "guild_mgr.h"
+#include "map.h"
+#include "net.h"
+#include "npc.h"
+#include "object.h"
+#include "pathing.h"
+#include "petitions.h"
 #include "quest_parser_collection.h"
+#include "spawn2.h"
+#include "spawngroup.h"
+#include "water_map.h"
+#include "worldserver.h"
+#include "zone_config.h"
+#include "zone.h"
 
 #ifdef _WINDOWS
 #define snprintf	_snprintf
@@ -65,18 +57,19 @@
 #define strcasecmp	_stricmp
 #endif
 
-
+extern bool staticzone;
+extern NetConnection net;
+extern PetitionList petition_list;
+extern QuestParserCollection* parse;
+extern uint16 adverrornum;
+extern uint32 numclients;
 extern WorldServer worldserver;
 extern Zone* zone;
-extern uint32 numclients;
-extern NetConnection net;
-extern uint16 adverrornum;
-extern PetitionList petition_list;
+
 Mutex MZoneShutdown;
-extern bool staticzone;
-Zone* zone = 0;
+
 volatile bool ZoneLoaded = false;
-extern QuestParserCollection* parse;
+Zone* zone = 0;
 
 bool Zone::Bootup(uint32 iZoneID, uint32 iInstanceID, bool iStaticZone) {
 	const char* zonename = database.GetZoneName(iZoneID);
@@ -400,7 +393,7 @@ void Zone::LoadTempMerchantData() {
 	LogFile->write(EQEMuLog::Status, "Loading Temporary Merchant Lists...");
 	std::string query = StringFormat(
 		"SELECT								   "
-		"ml.npcid,							   "
+		"DISTINCT ml.npcid,					   "
 		"ml.slot,							   "
 		"ml.charges,						   "
 		"ml.itemid							   "
@@ -445,7 +438,7 @@ void Zone::LoadNewMerchantData(uint32 merchantid) {
 
 	std::list<MerchantList> merlist;
 	std::string query = StringFormat("SELECT item, slot, faction_required, level_required, alt_currency_cost, "
-                                     "classes_required FROM merchantlist WHERE merchantid=%d ORDER BY slot", merchantid);
+                                     "classes_required, probability FROM merchantlist WHERE merchantid=%d ORDER BY slot", merchantid);
     auto results = database.QueryDatabase(query);
     if (!results.Success()) {
         LogFile->write(EQEMuLog::Error, "Error in LoadNewMerchantData query '%s' %s", query.c_str(), results.ErrorMessage().c_str());
@@ -459,8 +452,9 @@ void Zone::LoadNewMerchantData(uint32 merchantid) {
         ml.slot = atoul(row[1]);
         ml.faction_required = atoul(row[2]);
         ml.level_required = atoul(row[3]);
-        ml.alt_currency_cost = atoul(row[3]);
-        ml.classes_required = atoul(row[4]);
+        ml.alt_currency_cost = atoul(row[4]);
+        ml.classes_required = atoul(row[5]);
+		ml.probability = atoul(row[6]);
         merlist.push_back(ml);
     }
 
@@ -471,7 +465,7 @@ void Zone::GetMerchantDataForZoneLoad() {
 	LogFile->write(EQEMuLog::Status, "Loading Merchant Lists...");
 	std::string query = StringFormat(												   
 		"SELECT																		   "
-		"ml.merchantid,																   "
+		"DISTINCT ml.merchantid,													   "
 		"ml.slot,																	   "
 		"ml.item,																	   "
 		"ml.faction_required,														   "
@@ -491,7 +485,7 @@ void Zone::GetMerchantDataForZoneLoad() {
 	std::map<uint32, std::list<MerchantList> >::iterator cur;
 	uint32 npcid = 0;
 	if (results.RowCount() == 0) {
-		LogFile->write(EQEMuLog::Error, "Error in loading Merchant Data for zone");
+		LogFile->write(EQEMuLog::Debug, "No Merchant Data found for %s.", GetShortName());
 		return;
 	}
 	for (auto row = results.begin(); row != results.end(); ++row) { 
@@ -754,6 +748,7 @@ Zone::Zone(uint32 in_zoneid, uint32 in_instanceid, const char* in_short_name)
 	zoneid = in_zoneid;
 	instanceid = in_instanceid;
 	instanceversion = database.GetInstanceVersion(instanceid);
+	pers_instance = false;
 	zonemap = nullptr;
 	watermap = nullptr;
 	pathing = nullptr;
@@ -823,11 +818,12 @@ Zone::Zone(uint32 in_zoneid, uint32 in_instanceid, const char* in_short_name)
 		if(!is_perma)
 		{
 			if(rem < 150) //give some leeway to people who are zoning in 2.5 minutes to finish zoning in and get ported out
-			rem = 150;
+				rem = 150;
 			Instance_Timer = new Timer(rem * 1000);
 		}
 		else
 		{
+			pers_instance = true;
 			Instance_Timer = nullptr;
 		}
 	}
@@ -914,7 +910,7 @@ bool Zone::Init(bool iStaticZone) {
 	}
 
 	LogFile->write(EQEMuLog::Status, "Loading player corpses...");
-	if (!database.LoadPlayerCorpses(zoneid, instanceid)) {
+	if (!database.LoadCharacterCorpses(zoneid, instanceid)) {
 		LogFile->write(EQEMuLog::Error, "Loading player corpses failed.");
 		return false;
 	}

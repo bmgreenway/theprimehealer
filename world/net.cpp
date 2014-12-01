@@ -111,6 +111,15 @@ int main(int argc, char** argv) {
 	RegisterExecutablePlatform(ExePlatformWorld);
 	set_exception_handler();
 
+	/* Database Version Check */
+	uint32 Database_Version = CURRENT_BINARY_DATABASE_VERSION;
+	if (argc >= 2) { 
+		if (strcasecmp(argv[1], "db_version") == 0) {
+			std::cout << "Binary Database Version: " << Database_Version << std::endl;
+			return 0;
+		}
+	}
+
 	// Load server configuration
 	_log(WORLD__INIT, "Loading server configuration..");
 	if (!WorldConfig::LoadConfig()) {
@@ -327,9 +336,6 @@ int main(int argc, char** argv) {
 	_log(WORLD__INIT, "Reboot zone modes %s",holdzones ? "ON" : "OFF");
 
 	_log(WORLD__INIT, "Deleted %i stale player corpses from database", database.DeleteStalePlayerCorpses());
-	if (RuleB(World, DeleteStaleCorpeBackups) == true) {
-	_log(WORLD__INIT, "Deleted %i stale player backups from database", database.DeleteStalePlayerBackups());
-	}
 
 	_log(WORLD__INIT, "Loading adventures...");
 	if(!adventure_manager.LoadAdventureTemplates())

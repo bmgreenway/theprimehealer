@@ -17,13 +17,9 @@
 */
 #include "../common/debug.h"
 #include <iostream>
-#include <iomanip>
-#include <sstream>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <signal.h>
-#include <math.h>
 
 // for windows compile
 #ifdef _WINDOWS
@@ -39,27 +35,17 @@
 extern volatile bool RunLoops;
 
 #include "../common/features.h"
-#include "../common/misc.h"
 #include "../common/spdat.h"
-#include "../common/packet_dump.h"
-#include "../common/packet_functions.h"
-#include "../common/serverinfo.h"
-#include "../common/zone_numbers.h"
-#include "../common/moremath.h"
 #include "../common/guilds.h"
-#include "../common/breakdowns.h"
 #include "../common/rulesys.h"
 #include "../common/string_util.h"
 #include "../common/data_verification.h"
 #include "net.h"
-#include "masterentity.h"
 #include "worldserver.h"
 #include "zonedb.h"
 #include "petitions.h"
-#include "forage.h"
 #include "command.h"
 #include "string_ids.h"
-#include "npc_ai.h"
 #include "client_logs.h"
 #include "guild_mgr.h"
 #include "quest_parser_collection.h"
@@ -327,6 +313,8 @@ Client::Client(EQStreamInterface* ieqs)
 
 	EngagedRaidTarget = false;
 	SavedRaidRestTimer = 0;
+
+	interrogateinv_flag = false;
 }
 
 Client::~Client() {
@@ -396,7 +384,7 @@ Client::~Client() {
 	if(IsHoveringForRespawn())
 	{
 		m_pp.zone_id = m_pp.binds[0].zoneId;
-		m_pp.zoneInstance = 0;
+		m_pp.zoneInstance = m_pp.binds[0].instance_id;
 		x_pos = m_pp.binds[0].x;
 		y_pos = m_pp.binds[0].y;
 		z_pos = m_pp.binds[0].z;
@@ -541,11 +529,11 @@ bool Client::Save(uint8 iCommitNow) {
 	m_pp.endurance = cur_end;
 
 	/* Save Character Currency */
-	database.SaveCharacterCurrency(this->CharacterID(), &m_pp);
+	database.SaveCharacterCurrency(CharacterID(), &m_pp);
 
-	/* Save Current Bind Points : Sets Instance to 0 because it is currently not implemented */
-	database.SaveCharacterBindPoint(this->CharacterID(), m_pp.binds[0].zoneId, 0, m_pp.binds[0].x, m_pp.binds[0].y, m_pp.binds[0].z, 0, 0); /* Regular bind */
-	database.SaveCharacterBindPoint(this->CharacterID(), m_pp.binds[4].zoneId, 0, m_pp.binds[4].x, m_pp.binds[4].y, m_pp.binds[4].z, 0, 1); /* Home Bind */
+	/* Save Current Bind Points */
+	database.SaveCharacterBindPoint(CharacterID(), m_pp.binds[0].zoneId, m_pp.binds[0].instance_id, m_pp.binds[0].x, m_pp.binds[0].y, m_pp.binds[0].z, 0, 0); /* Regular bind */
+	database.SaveCharacterBindPoint(CharacterID(), m_pp.binds[4].zoneId, m_pp.binds[4].instance_id, m_pp.binds[4].x, m_pp.binds[4].y, m_pp.binds[4].z, 0, 1); /* Home Bind */
 
 	/* Save Character Buffs */
 	database.SaveBuffs(this);
@@ -1880,15 +1868,36 @@ void Client::FillSpawnStruct(NewSpawn_Struct* ns, Mob* ForWho)
 		ns->spawn.equipment[MaterialFeet]	= item->Material;
 		ns->spawn.colors[MaterialFeet].color	= GetEquipmentColor(MaterialFeet);
 	}
+	int ornamentationAugtype = RuleI(Character, OrnamentationAugmentType);
 	if ((inst = m_inv[MainPrimary]) && inst->IsType(ItemClassCommon)) {
-		item = inst->GetItem();
-		if (strlen(item->IDFile) > 2)
-			ns->spawn.equipment[MaterialPrimary] = atoi(&item->IDFile[2]);
+		if (inst->GetOrnamentationAug(ornamentationAugtype)) {
+			item = inst->GetOrnamentationAug(ornamentationAugtype)->GetItem();
+			if (strlen(item->IDFile) > 2)
+				ns->spawn.equipment[MaterialPrimary] = atoi(&item->IDFile[2]);
+		}
+		else if (inst->GetOrnamentationIcon() && inst->GetOrnamentationIDFile()) {
+			ns->spawn.equipment[MaterialPrimary] = inst->GetOrnamentationIDFile();
+		}
+		else {
+			item = inst->GetItem();
+			if (strlen(item->IDFile) > 2)
+				ns->spawn.equipment[MaterialPrimary] = atoi(&item->IDFile[2]);
+		}
 	}
 	if ((inst = m_inv[MainSecondary]) && inst->IsType(ItemClassCommon)) {
-		item = inst->GetItem();
-		if (strlen(item->IDFile) > 2)
-			ns->spawn.equipment[MaterialSecondary] = atoi(&item->IDFile[2]);
+		if (inst->GetOrnamentationAug(ornamentationAugtype)) {
+			item = inst->GetOrnamentationAug(ornamentationAugtype)->GetItem();
+			if (strlen(item->IDFile) > 2)
+				ns->spawn.equipment[MaterialSecondary] = atoi(&item->IDFile[2]);
+		}
+		else if (inst->GetOrnamentationIcon() && inst->GetOrnamentationIDFile()) {
+			ns->spawn.equipment[MaterialSecondary] = inst->GetOrnamentationIDFile();
+		}
+		else {
+			item = inst->GetItem();
+			if (strlen(item->IDFile) > 2)
+				ns->spawn.equipment[MaterialSecondary] = atoi(&item->IDFile[2]);
+		}
 	}
 
 	//these two may be related to ns->spawn.texture
@@ -2310,7 +2319,7 @@ bool Client::CheckIncreaseSkill(SkillUseTypes skillid, Mob *against_who, int cha
 	if (skillval < maxskill)
 	{
 		// the higher your current skill level, the harder it is
-		int16 Chance = 10 + chancemodi + ((252 - skillval) / 20);
+		int32 Chance = 10 + chancemodi + ((252 - skillval) / 20);
 
 		Chance = (Chance * RuleI(Character, SkillUpModifier) / 100);
 
@@ -2344,7 +2353,7 @@ void Client::CheckLanguageSkillIncrease(uint8 langid, uint8 TeacherSkill) {
 	int LangSkill = m_pp.languages[langid];		// get current language skill
 
 	if (LangSkill < 100) {	// if the language isn't already maxed
-		int16 Chance = 5 + ((TeacherSkill - LangSkill)/10);	// greater chance to learn if teacher's skill is much higher than yours
+		int32 Chance = 5 + ((TeacherSkill - LangSkill)/10);	// greater chance to learn if teacher's skill is much higher than yours
 		Chance = (Chance * RuleI(Character, SkillUpModifier)/100);
 
 		if(MakeRandomFloat(0,100) < Chance) {	// if they make the roll
@@ -2565,38 +2574,6 @@ void Client::LogMerchant(Client* player, Mob* merchant, uint32 quantity, uint32 
 	}
 }
 
-void Client::LogLoot(Client* player, Corpse* corpse, const Item_Struct* item){
-	char* logtext;
-	char itemid[100];
-	char itemname[100];
-	char coinloot[100];
-	if (item!=0){
-		memset(itemid,0,sizeof(itemid));
-		memset(itemname,0,sizeof(itemid));
-		itoa(item->ID,itemid,10);
-		sprintf(itemname,"%s",item->Name);
-		logtext=itemname;
-
-		strcat(logtext,"(");
-		strcat(logtext,itemid);
-		strcat(logtext,") Looted");
-		database.logevents(player->AccountName(),player->AccountID(),player->admin,player->GetName(),corpse->orgname,"Looting Item",logtext,4);
-	}
-	else{
-		if ((corpse->GetPlatinum() + corpse->GetGold() + corpse->GetSilver() + corpse->GetCopper())>0) {
-			memset(coinloot,0,sizeof(coinloot));
-			sprintf(coinloot,"%i PP %i GP %i SP %i CP",corpse->GetPlatinum(),corpse->GetGold(),corpse->GetSilver(),corpse->GetCopper());
-			logtext=coinloot;
-			strcat(logtext," Looted");
-			if (corpse->GetPlatinum()>10000)
-				database.logevents(player->AccountName(),player->AccountID(),player->admin,player->GetName(),corpse->orgname,"Excessive Loot!",logtext,9);
-			else
-				database.logevents(player->AccountName(),player->AccountID(),player->admin,player->GetName(),corpse->orgname,"Looting Money",logtext,5);
-		}
-	}
-}
-
-
 bool Client::BindWound(Mob* bindmob, bool start, bool fail){
 	EQApplicationPacket* outapp = 0;
 	if(!fail) {
@@ -2759,6 +2736,7 @@ bool Client::BindWound(Mob* bindmob, bool start, bool fail){
 
 void Client::SetMaterial(int16 in_slot, uint32 item_id) {
 	const Item_Struct* item = database.GetItem(item_id);
+	int ornamentationAugtype = RuleI(Character, OrnamentationAugmentType);
 	if (item && (item->ItemClass==ItemClassCommon)) {
 		if (in_slot==MainHead)
 			m_pp.item_material[MaterialHead]		= item->Material;
@@ -2774,10 +2752,32 @@ void Client::SetMaterial(int16 in_slot, uint32 item_id) {
 			m_pp.item_material[MaterialLegs]		= item->Material;
 		else if (in_slot==MainFeet)
 			m_pp.item_material[MaterialFeet]		= item->Material;
-		else if (in_slot==MainPrimary)
-			m_pp.item_material[MaterialPrimary]		= atoi(item->IDFile+2);
-		else if (in_slot==MainSecondary)
-			m_pp.item_material[MaterialSecondary]	= atoi(item->IDFile+2);
+		else if (in_slot == MainPrimary) {
+			const ItemInst* inst = m_inv[MainPrimary];
+			if (inst && inst->GetOrnamentationAug(ornamentationAugtype)) {
+				item = inst->GetOrnamentationAug(ornamentationAugtype)->GetItem();
+				m_pp.item_material[MaterialPrimary] = atoi(item->IDFile + 2);
+			}
+			else if (inst && inst->GetOrnamentationIcon() && inst->GetOrnamentationIDFile()) {
+				m_pp.item_material[MaterialPrimary] = inst->GetOrnamentationIDFile();
+			}
+			else {
+				m_pp.item_material[MaterialPrimary] = atoi(item->IDFile + 2);
+			}
+		}
+		else if (in_slot == MainSecondary) {
+			const ItemInst* inst = m_inv[MainSecondary];
+			if (inst && inst->GetOrnamentationAug(ornamentationAugtype)) {
+				item = inst->GetOrnamentationAug(ornamentationAugtype)->GetItem();
+				m_pp.item_material[MaterialSecondary] = atoi(item->IDFile + 2);
+			}
+			else if (inst && inst->GetOrnamentationIcon() && inst->GetOrnamentationIDFile()) {
+				m_pp.item_material[MaterialSecondary] = inst->GetOrnamentationIDFile();
+			}
+			else {
+				m_pp.item_material[MaterialSecondary] = atoi(item->IDFile + 2);
+			}
+		}
 	}
 }
 
@@ -3184,6 +3184,10 @@ void Client::LinkDead()
 	{
 		entity_list.MessageGroup(this,true,15,"%s has gone linkdead.",GetName());
 		GetGroup()->DelMember(this);
+		if (GetMerc())
+		{
+			GetMerc()->RemoveMercFromGroup(GetMerc(), GetMerc()->GetGroup());
+		}
 	}
 	Raid *raid = entity_list.GetRaidByClient(this);
 	if(raid){
@@ -3814,7 +3818,8 @@ void Client::Sacrifice(Client *caster)
 
 void Client::SendOPTranslocateConfirm(Mob *Caster, uint16 SpellID) {
 
-	if(!Caster || PendingTranslocate) return;
+	if(!Caster || PendingTranslocate) 
+		return;
 
 	const SPDat_Spell_Struct &Spell = spells[SpellID];
 
@@ -3822,26 +3827,29 @@ void Client::SendOPTranslocateConfirm(Mob *Caster, uint16 SpellID) {
 	Translocate_Struct *ts = (Translocate_Struct*)outapp->pBuffer;
 
 	strcpy(ts->Caster, Caster->GetName());
-	ts->SpellID = SpellID;
+	PendingTranslocateData.spell_id = ts->SpellID = SpellID;
 
 	if((SpellID == 1422) || (SpellID == 1334) || (SpellID == 3243)) {
-		ts->ZoneID = m_pp.binds[0].zoneId;
-		ts->x = m_pp.binds[0].x;
-		ts->y = m_pp.binds[0].y;
-		ts->z = m_pp.binds[0].z;
+		PendingTranslocateData.zone_id = ts->ZoneID = m_pp.binds[0].zoneId;
+		PendingTranslocateData.instance_id = m_pp.binds[0].instance_id;
+		PendingTranslocateData.x = ts->x = m_pp.binds[0].x;
+		PendingTranslocateData.y = ts->y = m_pp.binds[0].y;
+		PendingTranslocateData.z = ts->z = m_pp.binds[0].z;
+		PendingTranslocateData.heading = m_pp.binds[0].heading;
 	}
 	else {
-		ts->ZoneID = database.GetZoneID(Spell.teleport_zone);
-		ts->y = Spell.base[0];
-		ts->x = Spell.base[1];
-		ts->z = Spell.base[2];
+		PendingTranslocateData.zone_id = ts->ZoneID = database.GetZoneID(Spell.teleport_zone);
+		PendingTranslocateData.instance_id = 0;
+		PendingTranslocateData.y = ts->y = Spell.base[0];
+		PendingTranslocateData.x = ts->x = Spell.base[1];
+		PendingTranslocateData.z = ts->z = Spell.base[2];
+		PendingTranslocateData.heading = 0.0;
 	}
 
 	ts->unknown008 = 0;
 	ts->Complete = 0;
 
-	PendingTranslocateData = *ts;
-	PendingTranslocate=true;
+	PendingTranslocate = true;
 	TranslocateTime = time(nullptr);
 
 	QueuePacket(outapp);
@@ -4101,6 +4109,184 @@ void Client::UpdateLFP() {
 	worldserver.UpdateLFP(CharacterID(), LFPMembers);
 }
 
+bool Client::GroupFollow(Client* inviter) {
+
+	if (inviter)
+	{
+		isgrouped = true;
+		Raid* raid = entity_list.GetRaidByClient(inviter);
+		Raid* iraid = entity_list.GetRaidByClient(this);
+
+		//inviter has a raid don't do group stuff instead do raid stuff!
+		if (raid)
+		{
+			// Suspend the merc while in a raid (maybe a rule could be added for this)
+			if (GetMerc())
+				GetMerc()->Suspend();
+
+			uint32 groupToUse = 0xFFFFFFFF;
+			for (int x = 0; x < MAX_RAID_MEMBERS; x++)
+			{
+				if (raid->members[x].member)
+				{
+					//this assumes the inviter is in the zone
+					if (raid->members[x].member == inviter){
+						groupToUse = raid->members[x].GroupNumber;
+						break;
+					}
+				}
+			}
+			if (iraid == raid)
+			{
+				//both in same raid
+				uint32 ngid = raid->GetGroup(inviter->GetName());
+				if (raid->GroupCount(ngid) < 6)
+				{
+					raid->MoveMember(GetName(), ngid);
+					raid->SendGroupDisband(this);
+					//raid->SendRaidGroupAdd(GetName(), ngid);
+					//raid->SendGroupUpdate(this);
+					raid->GroupUpdate(ngid); //break
+				}
+				return false;
+			}
+			if (raid->RaidCount() < MAX_RAID_MEMBERS)
+			{
+				if (raid->GroupCount(groupToUse) < 6)
+				{
+					raid->SendRaidCreate(this);
+					raid->SendMakeLeaderPacketTo(raid->leadername, this);
+					raid->AddMember(this, groupToUse);
+					raid->SendBulkRaid(this);
+					//raid->SendRaidGroupAdd(GetName(), groupToUse);
+					//raid->SendGroupUpdate(this);
+					raid->GroupUpdate(groupToUse); //break
+					if (raid->IsLocked())
+					{
+						raid->SendRaidLockTo(this);
+					}
+					return false;
+				}
+				else
+				{
+					raid->SendRaidCreate(this);
+					raid->SendMakeLeaderPacketTo(raid->leadername, this);
+					raid->AddMember(this);
+					raid->SendBulkRaid(this);
+					if (raid->IsLocked())
+					{
+						raid->SendRaidLockTo(this);
+					}
+					return false;
+				}
+			}
+		}
+
+		Group* group = entity_list.GetGroupByClient(inviter);
+
+		if (!group)
+		{
+			//Make new group
+			group = new Group(inviter);
+
+			if (!group)
+			{
+				return false;
+			}
+
+			entity_list.AddGroup(group);
+
+			if (group->GetID() == 0)
+			{
+				Message(13, "Unable to get new group id. Cannot create group.");
+				inviter->Message(13, "Unable to get new group id. Cannot create group.");
+				return false;
+			}
+
+			//now we have a group id, can set inviter's id
+			database.SetGroupID(inviter->GetName(), group->GetID(), inviter->CharacterID(), false);
+			database.SetGroupLeaderName(group->GetID(), inviter->GetName());
+			group->UpdateGroupAAs();
+
+			//Invite the inviter into the group first.....dont ask
+			if (inviter->GetClientVersion() < EQClientSoD)
+			{
+				EQApplicationPacket* outapp = new EQApplicationPacket(OP_GroupUpdate, sizeof(GroupJoin_Struct));
+				GroupJoin_Struct* outgj = (GroupJoin_Struct*)outapp->pBuffer;
+				strcpy(outgj->membername, inviter->GetName());
+				strcpy(outgj->yourname, inviter->GetName());
+				outgj->action = groupActInviteInitial; // 'You have formed the group'.
+				group->GetGroupAAs(&outgj->leader_aas);
+				inviter->QueuePacket(outapp);
+				safe_delete(outapp);
+			}
+			else
+			{
+				// SoD and later
+				inviter->SendGroupCreatePacket();
+				inviter->SendGroupLeaderChangePacket(inviter->GetName());
+				inviter->SendGroupJoinAcknowledge();
+			}
+
+		}
+
+		if (!group)
+		{
+			return false;
+		}
+
+		// Remove merc from old group before adding client to the new one
+		if (GetMerc() && GetMerc()->HasGroup())
+		{
+			GetMerc()->RemoveMercFromGroup(GetMerc(), GetMerc()->GetGroup());
+		}
+
+		if (!group->AddMember(this))
+		{
+			// If failed to add client to new group, regroup with merc
+			if (GetMerc())
+			{
+				GetMerc()->MercJoinClientGroup();
+			}
+			else
+			{
+				isgrouped = false;
+			}
+			return false;
+		}
+
+		if (GetClientVersion() >= EQClientSoD)
+		{
+			SendGroupJoinAcknowledge();
+		}
+
+		// Temporary hack for SoD, as things seem to work quite differently
+		if (inviter->IsClient() && inviter->GetClientVersion() >= EQClientSoD)
+		{
+			database.RefreshGroupFromDB(inviter);
+		}
+
+		// Add the merc back into the new group if possible
+		if (GetMerc())
+		{
+			GetMerc()->MercJoinClientGroup();
+		}
+		
+		if (inviter->IsLFP())
+		{
+			// If the player who invited us to a group is LFP, have them update world now that we have joined their group.
+			inviter->UpdateLFP();
+		}
+
+		database.RefreshGroupFromDB(this);
+		group->SendHPPacketsTo(this);
+		//send updates to clients out of zone...
+		group->SendGroupJoinOOZ(this);
+		return true;
+	}
+	return false;
+}
+
 uint16 Client::GetPrimarySkillValue()
 {
 	SkillUseTypes skill = HIGHEST_SKILL; //because nullptr == 0, which is 1H Slashing, & we want it to return 0 from GetSkill
@@ -4161,10 +4347,10 @@ uint16 Client::GetPrimarySkillValue()
 	return GetSkill(skill);
 }
 
-uint16 Client::GetTotalATK()
+uint32 Client::GetTotalATK()
 {
-	uint16 AttackRating = 0;
-	uint16 WornCap = itembonuses.ATK;
+	uint32 AttackRating = 0;
+	uint32 WornCap = itembonuses.ATK;
 
 	if(IsClient()) {
 		AttackRating = ((WornCap * 1.342) + (GetSkill(SkillOffense) * 1.345) + ((GetSTR() - 66) * 0.9) + (GetPrimarySkillValue() * 2.69));
@@ -4181,9 +4367,9 @@ uint16 Client::GetTotalATK()
 	return AttackRating;
 }
 
-uint16 Client::GetATKRating()
+uint32 Client::GetATKRating()
 {
-	uint16 AttackRating = 0;
+	uint32 AttackRating = 0;
 	if(IsClient()) {
 		AttackRating = (GetSkill(SkillOffense) * 1.345) + ((GetSTR() - 66) * 0.9) + (GetPrimarySkillValue() * 2.69);
 
@@ -4439,7 +4625,8 @@ void Client::SendRespawnBinds()
 		BindStruct* b = &m_pp.binds[0];
 		RespawnOption opt;
 		opt.name = "Bind Location";
-		opt.zoneid = b->zoneId;
+		opt.zone_id = b->zoneId;
+		opt.instance_id = b->instance_id;
 		opt.x = b->x;
 		opt.y = b->y;
 		opt.z = b->z;
@@ -4449,7 +4636,8 @@ void Client::SendRespawnBinds()
 	//Rez is always added at the end
 	RespawnOption rez;
 	rez.name = "Resurrect";
-	rez.zoneid = zone->GetZoneID();
+	rez.zone_id = zone->GetZoneID();
+	rez.instance_id = zone->GetInstanceID();
 	rez.x = GetX();
 	rez.y = GetY();
 	rez.z = GetZ();
@@ -4484,7 +4672,7 @@ void Client::SendRespawnBinds()
 	{
 		opt = &(*itr);
 		VARSTRUCT_ENCODE_TYPE(uint32, buffer, count++); //option num (from 0)
-		VARSTRUCT_ENCODE_TYPE(uint32, buffer, opt->zoneid);
+		VARSTRUCT_ENCODE_TYPE(uint32, buffer, opt->zone_id);
 		VARSTRUCT_ENCODE_TYPE(float, buffer, opt->x);
 		VARSTRUCT_ENCODE_TYPE(float, buffer, opt->y);
 		VARSTRUCT_ENCODE_TYPE(float, buffer, opt->z);
@@ -4747,7 +4935,7 @@ void Client::SummonAndRezzAllCorpses()
 
 	entity_list.RemoveAllCorpsesByCharID(CharacterID());
 
-	int CorpseCount = database.SummonAllPlayerCorpses(CharacterID(), zone->GetZoneID(), zone->GetInstanceID(),
+	int CorpseCount = database.SummonAllCharacterCorpses(CharacterID(), zone->GetZoneID(), zone->GetInstanceID(),
 								GetX(), GetY(), GetZ(), GetHeading());
 	if(CorpseCount <= 0)
 	{
@@ -4785,7 +4973,7 @@ void Client::SummonAllCorpses(float dest_x, float dest_y, float dest_z, float de
 
 	entity_list.RemoveAllCorpsesByCharID(CharacterID());
 
-	int CorpseCount = database.SummonAllPlayerCorpses(CharacterID(), zone->GetZoneID(), zone->GetInstanceID(),
+	int CorpseCount = database.SummonAllCharacterCorpses(CharacterID(), zone->GetZoneID(), zone->GetInstanceID(),
 								dest_x, dest_y, dest_z, dest_heading);
 	if(CorpseCount <= 0)
 	{
@@ -4829,7 +5017,7 @@ void Client::DepopPlayerCorpse(uint32 dbid)
 
 void Client::BuryPlayerCorpses()
 {
-	database.BuryAllPlayerCorpses(CharacterID());
+	database.BuryAllCharacterCorpses(CharacterID());
 }
 
 void Client::NotifyNewTitlesAvailable()
@@ -4857,6 +5045,10 @@ void Client::SetStartZone(uint32 zoneid, float x, float y, float z)
 		return;
 
 	m_pp.binds[4].zoneId = zoneid;
+	if(zone->GetInstanceID() != 0 && zone->IsInstancePersistent()) {
+		m_pp.binds[4].instance_id = zone->GetInstanceID();
+	}
+
 	if (x == 0 && y == 0 && z ==0)
 		database.GetSafePoints(m_pp.binds[4].zoneId, 0, &m_pp.binds[4].x, &m_pp.binds[4].y, &m_pp.binds[4].z);
 	else {
@@ -5627,15 +5819,26 @@ void Client::ProcessInspectRequest(Client* requestee, Client* requester) {
 
 		const Item_Struct* item = nullptr;
 		const ItemInst* inst = nullptr;
-
+		int ornamentationAugtype = RuleI(Character, OrnamentationAugmentType);
 		for(int16 L = 0; L <= 20; L++) {
 			inst = requestee->GetInv().GetItem(L);
 
 			if(inst) {
 				item = inst->GetItem();
 				if(item) {
-					strcpy(insr->itemnames[L], item->Name);
-					insr->itemicons[L] = item->Icon;
+					if (inst && inst->GetOrnamentationAug(ornamentationAugtype)) {
+						const Item_Struct *aug_weap = inst->GetOrnamentationAug(ornamentationAugtype)->GetItem();
+						strcpy(insr->itemnames[L], item->Name);
+						insr->itemicons[L] = aug_weap->Icon;
+					}
+					else if (inst->GetOrnamentationIcon() && inst->GetOrnamentationIDFile()) {
+						strcpy(insr->itemnames[L], item->Name);
+						insr->itemicons[L] = inst->GetOrnamentationIcon();
+					}					
+					else {
+						strcpy(insr->itemnames[L], item->Name);
+						insr->itemicons[L] = item->Icon;
+					}
 				}
 				else
 					insr->itemicons[L] = 0xFFFFFFFF;
@@ -6223,7 +6426,6 @@ void Client::Doppelganger(uint16 spell_id, Mob *target, const char *name_overrid
 
 	static const float swarm_pet_x[MAX_SWARM_PETS] = { 5, -5, 5, -5, 10, -10, 10, -10, 8, -8, 8, -8 };
 	static const float swarm_pet_y[MAX_SWARM_PETS] = { 5, 5, -5, -5, 10, 10, -10, -10, 8, 8, -8, -8 };
-	TempPets(true);
 
 	while(summon_count > 0) {
 		NPCType *npc_dup = nullptr;
@@ -6266,6 +6468,11 @@ void Client::Doppelganger(uint16 spell_id, Mob *target, const char *name_overrid
 void Client::AssignToInstance(uint16 instance_id)
 {
 	database.AddClientToInstance(instance_id, CharacterID());
+}
+
+void Client::RemoveFromInstance(uint16 instance_id)
+{
+	database.RemoveClientFromInstance(instance_id, CharacterID());
 }
 
 void Client::SendStatsWindow(Client* client, bool use_window)
@@ -7251,26 +7458,26 @@ void Client::SendMercPersonalInfo()
 {
 	uint32 mercTypeCount = 1;
 	uint32 mercCount = 1; //TODO: Un-hardcode this and support multiple mercs like in later clients than SoD.
-	//uint32 packetSize = 0;
-	uint32 i=0;
+	uint32 i = 0;
 	uint32 altCurrentType = 19; //TODO: Implement alternate currency purchases involving mercs!
 
-	if (GetClientVersion() >= EQClientRoF)
+	MercTemplate *mercData = &zone->merc_templates[GetMercInfo().MercTemplateID];
+	
+	int stancecount = 0;
+	stancecount += zone->merc_stance_list[GetMercInfo().MercTemplateID].size();
+	if(stancecount > MAX_MERC_STANCES || mercCount > MAX_MERC || mercTypeCount > MAX_MERC_GRADES)
 	{
-		MercTemplate *mercData = &zone->merc_templates[GetMercInfo().MercTemplateID];
+		if (MERC_DEBUG > 0)
+			Message(7, "Mercenary Debug: SendMercPersonalInfo Cancelled: (%i) (%i) (%i)", stancecount, mercCount, mercTypeCount);
+		SendMercMerchantResponsePacket(0);
+		return;
+	}
 
-		if (mercData)
+	if(mercData)
+	{
+		if (GetClientVersion() >= EQClientRoF)
 		{
-			int i = 0;
-			int stancecount = 0;
-			stancecount += zone->merc_stance_list[GetMercInfo().MercTemplateID].size();
-
-			if(stancecount > MAX_MERC_STANCES || mercCount > MAX_MERC || mercTypeCount > MAX_MERC_GRADES)
-			{
-				SendMercMerchantResponsePacket(0);
-				return;
-			}
-			if (mercCount > 0 && mercCount)
+			if (mercCount > 0)
 			{
 				EQApplicationPacket *outapp = new EQApplicationPacket(OP_MercenaryDataUpdate, sizeof(MercenaryDataUpdate_Struct));
 				MercenaryDataUpdate_Struct* mdus = (MercenaryDataUpdate_Struct*)outapp->pBuffer;
@@ -7308,40 +7515,19 @@ void Client::SendMercPersonalInfo()
 
 				mdus->MercData[i].MercUnk05 = 1;
 				FastQueuePacket(&outapp);
+				safe_delete(outapp);
 				return;
 			}
 		}
-	}
-	else
-	{
-		int stancecount = 0;
-		stancecount += zone->merc_stance_list[GetMercInfo().MercTemplateID].size();
-
-		if(mercCount > MAX_MERC || mercTypeCount > MAX_MERC_GRADES)
+		else
 		{
-			if (GetClientVersion() == EQClientSoD)
+			if(mercTypeCount > 0 && mercCount > 0)
 			{
-				SendMercMerchantResponsePacket(0);
-			}
-			return;
-		}
-
-		EQApplicationPacket *outapp = new EQApplicationPacket(OP_MercenaryDataResponse, sizeof(MercenaryMerchantList_Struct));
-		MercenaryMerchantList_Struct* mml = (MercenaryMerchantList_Struct*)outapp->pBuffer;
-		MercTemplate *mercData = &zone->merc_templates[GetMercInfo().MercTemplateID];
-
-
-		if(mercData)
-		{
-			if(mercTypeCount > 0)
-			{
-				mml->MercTypeCount = mercTypeCount; //We only should have one merc entry.
+				EQApplicationPacket *outapp = new EQApplicationPacket(OP_MercenaryDataResponse, sizeof(MercenaryMerchantList_Struct));
+				MercenaryMerchantList_Struct* mml = (MercenaryMerchantList_Struct*)outapp->pBuffer;
+				mml->MercTypeCount = mercTypeCount; //We should only have one merc entry.
 				mml->MercGrades[i] = 1;
-			}
-			mml->MercCount = mercCount;
-			if(mercCount > 0)
-			{
-
+				mml->MercCount = mercCount;
 				mml->Mercs[i].MercID = mercData->MercTemplateID;
 				mml->Mercs[i].MercType = mercData->MercType;
 				mml->Mercs[i].MercSubType = mercData->MercSubType;
@@ -7358,7 +7544,7 @@ void Client::SendMercPersonalInfo()
 				mml->Mercs[i].StanceCount = zone->merc_stance_list[mercData->MercTemplateID].size();
 				mml->Mercs[i].MercUnk03 = 0;
 				mml->Mercs[i].MercUnk04 = 1;
-				//mml->Mercs[i].MercName;
+				strn0cpy(mml->Mercs[i].MercName, GetMercInfo().merc_name , sizeof(mml->Mercs[i].MercName));
 				int stanceindex = 0;
 				if(mml->Mercs[i].StanceCount != 0)
 				{
@@ -7372,31 +7558,21 @@ void Client::SendMercPersonalInfo()
 					}
 				}
 				FastQueuePacket(&outapp);
-			}
-			else
-			{
 				safe_delete(outapp);
-				if (GetClientVersion() == EQClientSoD)
-				{
-					SendMercMerchantResponsePacket(0);
-				}
 				return;
 			}
-			if (GetClientVersion() == EQClientSoD)
-			{
-				SendMercMerchantResponsePacket(0);
-			}
 		}
-		else
-		{
-			safe_delete(outapp);
-			if (GetClientVersion() == EQClientSoD)
-			{
-			SendMercMerchantResponsePacket(0);
-			}
-			return;
-		}
+		if (MERC_DEBUG > 0)
+			Message(7, "Mercenary Debug: SendMercPersonalInfo Send Successful");
+			
+		SendMercMerchantResponsePacket(0);
 	}
+	else
+	{
+		if (MERC_DEBUG > 0)
+			Message(7, "Mercenary Debug: SendMercPersonalInfo Send Failed Due to no MercData for %i", GetMercInfo().MercTemplateID);
+	}
+
 }
 
 void Client::SendClearMercInfo()
@@ -7458,7 +7634,7 @@ FACTION_VALUE Client::GetReverseFactionCon(Mob* iOther) {
 }
 
 //o--------------------------------------------------------------
-//| Name: GetFactionLevel; rembrant, Dec. 16, 2001
+//| Name: GetFactionLevel; Dec. 16, 2001
 //o--------------------------------------------------------------
 //| Notes: Gets the characters faction standing with the specified NPC.
 //|			Will return Indifferent on failure.
@@ -7471,7 +7647,7 @@ FACTION_VALUE Client::GetFactionLevel(uint32 char_id, uint32 npc_id, uint32 p_ra
 	int32 tmpFactionValue;
 	FactionMods fmods;
 
-	// neotokyo: few optimizations
+	// few optimizations
 	if (GetFeigned())
 		return FACTION_INDIFFERENT;
 	if (invisible_undead && tnpc && !tnpc->SeeInvisibleUndead())
@@ -7494,7 +7670,7 @@ FACTION_VALUE Client::GetFactionLevel(uint32 char_id, uint32 npc_id, uint32 p_ra
 		{
 			//Get the players current faction with pFaction
 			tmpFactionValue = GetCharacterFactionLevel(pFaction);
-			// Everhood - tack on any bonuses from Alliance type spell effects
+			//Tack on any bonuses from Alliance type spell effects
 			tmpFactionValue += GetFactionBonus(pFaction);
 			tmpFactionValue += GetItemFactionBonus(pFaction);
 			//Return the faction to the client
@@ -7516,97 +7692,77 @@ FACTION_VALUE Client::GetFactionLevel(uint32 char_id, uint32 npc_id, uint32 p_ra
 	return fac;
 }
 
-//o--------------------------------------------------------------
-//| Name: SetFactionLevel; rembrant, Dec. 20, 2001
-//o--------------------------------------------------------------
-//| Notes: Sets the characters faction standing with the specified NPC.
-//o--------------------------------------------------------------
+//Sets the characters faction standing with the specified NPC.
 void Client::SetFactionLevel(uint32 char_id, uint32 npc_id, uint8 char_class, uint8 char_race, uint8 char_deity)
 {
-	int32 faction_id[MAX_NPC_FACTIONS]={ 0,0,0,0,0,0,0,0,0,0 };
-	int32 npc_value[MAX_NPC_FACTIONS]={ 0,0,0,0,0,0,0,0,0,0 };
-	uint8 temp[MAX_NPC_FACTIONS]={ 0,0,0,0,0,0,0,0,0,0 };
+	int32 faction_id[MAX_NPC_FACTIONS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	int32 npc_value[MAX_NPC_FACTIONS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	uint8 temp[MAX_NPC_FACTIONS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 	int32 mod;
-	int32 t;
 	int32 tmpValue;
 	int32 current_value;
 	FactionMods fm;
+	bool change = false;
+	bool repair = false;
+
 	// Get the npc faction list
-	if(!database.GetNPCFactionList(npc_id, faction_id, npc_value, temp))
+	if (!database.GetNPCFactionList(npc_id, faction_id, npc_value, temp))
 		return;
-	for(int i = 0;i<MAX_NPC_FACTIONS;i++)
+	for (int i = 0; i < MAX_NPC_FACTIONS; i++)
 	{
-		if(faction_id[i] <= 0)
+		if (faction_id[i] <= 0)
 			continue;
 
 		// Get the faction modifiers
-		if(database.GetFactionData(&fm,char_class,char_race,char_deity,faction_id[i]))
+		if (database.GetFactionData(&fm, char_class, char_race, char_deity, faction_id[i]))
 		{
 			// Get the characters current value with that faction
 			current_value = GetCharacterFactionLevel(faction_id[i]);
 
-			if(this->itembonuses.HeroicCHA) {
+			if (this->itembonuses.HeroicCHA)
+			{
 				int faction_mod = itembonuses.HeroicCHA / 5;
 				// If our result isn't truncated, then just do that
-				if(npc_value[i] * faction_mod / 100 != 0)
+				if (npc_value[i] * faction_mod / 100 != 0)
 					npc_value[i] += npc_value[i] * faction_mod / 100;
 				// If our result is truncated, then double a mob's value every once and a while to equal what they would have got
-				else {
-					if(MakeRandomInt(0, 100) < faction_mod)
+				else
+				{
+					if (MakeRandomInt(0, 100) < faction_mod)
 						npc_value[i] *= 2;
 				}
 			}
-			//figure out their modifier
-			mod = fm.base + fm.class_mod + fm.race_mod + fm.deity_mod;
-			if(mod > MAX_FACTION)
-				mod = MAX_FACTION;
-			else if(mod < MIN_FACTION)
-				mod = MIN_FACTION;
+			// Set flag when to update db
+			if (current_value > MAX_PERSONAL_FACTION)
+			{
+				current_value = MAX_PERSONAL_FACTION;
+				repair = true;
+			}
+			else if (current_value < MIN_PERSONAL_FACTION)
+			{
+				current_value = MIN_PERSONAL_FACTION;
+				repair = true;
+			}
+			else if ((m_pp.gm != 1) && (npc_value[i] != 0) && ((current_value != MAX_PERSONAL_FACTION) || (current_value != MIN_PERSONAL_FACTION)))
+				change = true;
 
-			// Calculate the faction
-			if(npc_value[i] != 0) {
-				tmpValue = current_value + mod + npc_value[i];
+			current_value += npc_value[i];
 
-				int16 FactionModPct = spellbonuses.FactionModPct + itembonuses.FactionModPct + aabonuses.FactionModPct;
-				tmpValue += (tmpValue * FactionModPct) / 100;
+			if (current_value > MAX_PERSONAL_FACTION)
+				current_value = MAX_PERSONAL_FACTION;
+			else if (current_value < MIN_PERSONAL_FACTION)
+				current_value = MIN_PERSONAL_FACTION;
 
-				// Make sure faction hits don't go to GMs...
-				if (m_pp.gm==1 && (tmpValue < current_value)) {
-					tmpValue = current_value;
-				}
+			if (change || repair)
+			{
+				database.SetCharacterFactionLevel(char_id, faction_id[i], current_value, temp[i], factionvalues);
 
-				// Make sure we dont go over the min/max faction limits
-				if(tmpValue >= MAX_FACTION)
+				if (change)
 				{
-					t = MAX_FACTION - mod;
-					if(current_value == t) {
-						//do nothing, it is already maxed out
-					} else if(!(database.SetCharacterFactionLevel(char_id, faction_id[i], t, temp[i], factionvalues)))
-					{
-						return;
-					}
+					mod = fm.base + fm.class_mod + fm.race_mod + fm.deity_mod;
+					tmpValue = current_value + mod + npc_value[i];
+					SendFactionMessage(npc_value[i], faction_id[i], tmpValue, temp[i]);
 				}
-				else if(tmpValue <= MIN_FACTION)
-				{
-					t = MIN_FACTION - mod;
-					if(current_value == t) {
-						//do nothing, it is already maxed out
-					} else if(!(database.SetCharacterFactionLevel(char_id, faction_id[i], t, temp[i], factionvalues)))
-					{
-						return;
-					}
-				}
-				else
-				{
-					if(!(database.SetCharacterFactionLevel(char_id, faction_id[i], current_value + npc_value[i], temp[i], factionvalues)))
-					{
-						return;
-					}
-				}
-				if(tmpValue <= MIN_FACTION)
-					tmpValue = MIN_FACTION;
-
-				SendFactionMessage(npc_value[i], faction_id[i], tmpValue, temp[i]);
 			}
 		}
 	}
@@ -7634,19 +7790,17 @@ int32 Client::GetCharacterFactionLevel(int32 faction_id)
 		return 0;
 	faction_map::iterator res;
 	res = factionvalues.find(faction_id);
-	if(res == factionvalues.end())
-		return(0);
-	return(res->second);
+	if (res == factionvalues.end())
+		return 0;
+	return res->second;
 }
 
 // returns the character's faction level, adjusted for racial, class, and deity modifiers
 int32 Client::GetModCharacterFactionLevel(int32 faction_id) {
 	int32 Modded = GetCharacterFactionLevel(faction_id);
 	FactionMods fm;
-	if(database.GetFactionData(&fm,GetClass(),GetRace(),GetDeity(),faction_id))
+	if (database.GetFactionData(&fm, GetClass(), GetRace(), GetDeity(), faction_id))
 		Modded += fm.base + fm.class_mod + fm.race_mod + fm.deity_mod;
-	if (Modded > MAX_FACTION)
-		Modded = MAX_FACTION;
 
 	return Modded;
 }
@@ -7725,18 +7879,20 @@ void Client::SendFactionMessage(int32 tmpvalue, int32 faction_id, int32 totalval
 
 	// default to Faction# if we couldn't get the name from the ID
 	if (database.GetFactionName(faction_id, name, sizeof(name)) == false)
-		snprintf(name, sizeof(name),"Faction%i",faction_id);
+		snprintf(name, sizeof(name), "Faction%i", faction_id);
 
 	if (tmpvalue == 0 || temp == 1 || temp == 2)
 		return;
-	else if (totalvalue >= MAX_FACTION)
-		Message_StringID(0, FACTION_BEST, name);
-	else if (tmpvalue > 0 && totalvalue < MAX_FACTION)
-		Message_StringID(0, FACTION_BETTER, name);
-	else if (tmpvalue < 0 && totalvalue > MIN_FACTION)
-		Message_StringID(0, FACTION_WORSE, name);
-	else if (totalvalue <= MIN_FACTION)
-		Message_StringID(0, FACTION_WORST, name);
+	else if (totalvalue >= MAX_PERSONAL_FACTION)
+		Message_StringID(15, FACTION_BEST, name);
+	else if (totalvalue <= MIN_PERSONAL_FACTION)
+		Message_StringID(15, FACTION_WORST, name);
+	else if (tmpvalue > 0 && totalvalue < MAX_PERSONAL_FACTION && !RuleB(Client, UseLiveFactionMessage))
+		Message_StringID(15, FACTION_BETTER, name);
+	else if (tmpvalue < 0 && totalvalue > MIN_PERSONAL_FACTION && !RuleB(Client, UseLiveFactionMessage))
+		Message_StringID(15, FACTION_WORSE, name);
+	else if (RuleB(Client, UseLiveFactionMessage))
+		Message(15, "Your faction standing with %s has been adjusted by %i.", name, tmpvalue); //New Live faction message (14261)
 
 	return;
 }
@@ -7954,7 +8110,7 @@ void Client::SendItemScale(ItemInst *inst) {
 	}
 }
 
-void Client::AddRespawnOption(std::string option_name, uint32 zoneid, float x, float y, float z, float heading, bool initial_selection, int8 position)
+void Client::AddRespawnOption(std::string option_name, uint32 zoneid, uint16 instance_id, float x, float y, float z, float heading, bool initial_selection, int8 position)
 {
 	//If respawn window is already open, any changes would create an inconsistency with the client
 	if (IsHoveringForRespawn()) { return; }
@@ -7965,7 +8121,8 @@ void Client::AddRespawnOption(std::string option_name, uint32 zoneid, float x, f
 	//Create respawn option
 	RespawnOption res_opt;
 	res_opt.name = option_name;
-	res_opt.zoneid = zoneid;
+	res_opt.zone_id = zoneid;
+	res_opt.instance_id = instance_id;
 	res_opt.x = x;
 	res_opt.y = y;
 	res_opt.z = z;
@@ -8102,9 +8259,9 @@ void Client::Consume(const Item_Struct *item, uint8 type, int16 slot, bool auto_
 {
    if(!item) { return; }
 
-    uint16 cons_mod = 180;
+    uint32 cons_mod = 180;
 
-	int16 metabolism_bonus = spellbonuses.Metabolism + itembonuses.Metabolism + aabonuses.Metabolism;
+	int32 metabolism_bonus = spellbonuses.Metabolism + itembonuses.Metabolism + aabonuses.Metabolism;
 
 	if (metabolism_bonus)
 		cons_mod = cons_mod * metabolism_bonus * RuleI(Character, ConsumptionMultiplier) / 10000;

@@ -20,6 +20,9 @@
 #ifndef COMMAND_H
 #define COMMAND_H
 
+class Client;
+class Seperator;
+
 #include "../common/seperator.h"
 #include "../common/eq_stream.h"
 #include "client.h"
@@ -152,6 +155,7 @@ void command_heal(Client *c, const Seperator *sep);
 void command_appearance(Client *c, const Seperator *sep);
 void command_nukeitem(Client *c, const Seperator *sep);
 void command_peekinv(Client *c, const Seperator *sep);
+void command_interrogateinv(Client *c, const Seperator *sep);
 void command_findnpctype(Client *c, const Seperator *sep);
 void command_findzone(Client *c, const Seperator *sep);
 void command_viewnpctype(Client *c, const Seperator *sep);

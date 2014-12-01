@@ -15,17 +15,15 @@
 	along with this program; if not, write to the Free Software
 	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
-#include "../common/debug.h"
 
-#include "zone.h"
-#include "worldserver.h"
-#include "masterentity.h"
-#include "../common/packet_dump.h"
+#include "../common/debug.h"
 #include "../common/rulesys.h"
 #include "../common/string_util.h"
-#include "string_ids.h"
-#include "quest_parser_collection.h"
 #include "queryserv.h"
+#include "quest_parser_collection.h"
+#include "string_ids.h"
+#include "worldserver.h"
+#include "zone.h"
 
 extern QueryServ* QServ;
 extern WorldServer worldserver;
@@ -71,9 +69,11 @@ void Client::Handle_OP_ZoneChange(const EQApplicationPacket *app) {
 			break;
 		case GateToBindPoint:
 			target_zone_id = m_pp.binds[0].zoneId;
+			target_instance_id = m_pp.binds[0].instance_id;
 			break;
 		case ZoneToBindPoint:
 			target_zone_id = m_pp.binds[0].zoneId;
+			target_instance_id = m_pp.binds[0].instance_id;
 			break;
 		case ZoneSolicited: //we told the client to zone somewhere, so we know where they are going.
 			target_zone_id = zonesummon_id;
@@ -549,9 +549,35 @@ void Client::ZonePC(uint32 zoneID, uint32 instance_id, float x, float y, float z
 			break;
 	}
 
-	if(ReadyToZone) {
+	if (ReadyToZone)
+	{
+		//if client is looting, we need to send an end loot
+		if (IsLooting())
+		{
+			Entity* entity = entity_list.GetID(entity_id_being_looted);
+			if (entity == 0)
+			{
+				Message(13, "Error: OP_EndLootRequest: Corpse not found (ent = 0)");
+				if (GetClientVersion() >= EQClientSoD)
+					Corpse::SendEndLootErrorPacket(this);
+				else
+					Corpse::SendLootReqErrorPacket(this);
+			}
+			else if (!entity->IsCorpse())
+			{
+				Message(13, "Error: OP_EndLootRequest: Corpse not found (!entity->IsCorpse())");
+				Corpse::SendLootReqErrorPacket(this);
+			}
+			else
+			{
+				Corpse::SendEndLootErrorPacket(this);
+				entity->CastToCorpse()->EndLoot(this, nullptr);
+			}
+			SetLooting(0);
+		}
+
 		zone_mode = zm;
-		if(zm == ZoneToBindPoint) {
+		if (zm == ZoneToBindPoint) {
 			EQApplicationPacket* outapp = new EQApplicationPacket(OP_ZonePlayerToBind, sizeof(ZonePlayerToBind_Struct) + iZoneNameLength);
 			ZonePlayerToBind_Struct* gmg = (ZonePlayerToBind_Struct*) outapp->pBuffer;
 
@@ -691,20 +717,22 @@ void NPC::Gate() {
 	Mob::Gate();
 }
 
-void Client::SetBindPoint(int to_zone, float new_x, float new_y, float new_z) {
+void Client::SetBindPoint(int to_zone, int to_instance, float new_x, float new_y, float new_z) {
 	if (to_zone == -1) {
 		m_pp.binds[0].zoneId = zone->GetZoneID();
+		m_pp.binds[0].instance_id = (zone->GetInstanceID() != 0 && zone->IsInstancePersistent()) ? zone->GetInstanceID() : 0;
 		m_pp.binds[0].x = x_pos;
 		m_pp.binds[0].y = y_pos;
 		m_pp.binds[0].z = z_pos;
 	}
 	else {
 		m_pp.binds[0].zoneId = to_zone;
+		m_pp.binds[0].instance_id = to_instance;
 		m_pp.binds[0].x = new_x;
 		m_pp.binds[0].y = new_y;
 		m_pp.binds[0].z = new_z;
 	}
-	database.SaveCharacterBindPoint(this->CharacterID(), m_pp.binds[0].zoneId, 0, m_pp.binds[0].x, m_pp.binds[0].y, m_pp.binds[0].z, 0, 0);
+	database.SaveCharacterBindPoint(this->CharacterID(), m_pp.binds[0].zoneId, m_pp.binds[0].instance_id, m_pp.binds[0].x, m_pp.binds[0].y, m_pp.binds[0].z, 0, 0);
 }
 
 void Client::GoToBind(uint8 bindnum) {
@@ -715,13 +743,13 @@ void Client::GoToBind(uint8 bindnum) {
 	// move the client, which will zone them if needed.
 	// ignore restrictions on the zone request..?
 	if(bindnum == 0)
-		MovePC(m_pp.binds[0].zoneId, 0.0f, 0.0f, 0.0f, 0.0f, 1, GateToBindPoint);
+		MovePC(m_pp.binds[0].zoneId, m_pp.binds[0].instance_id, 0.0f, 0.0f, 0.0f, 0.0f, 1, GateToBindPoint);
 	else
-		MovePC(m_pp.binds[bindnum].zoneId, m_pp.binds[bindnum].x, m_pp.binds[bindnum].y, m_pp.binds[bindnum].z, m_pp.binds[bindnum].heading, 1);
+		MovePC(m_pp.binds[bindnum].zoneId, m_pp.binds[bindnum].instance_id, m_pp.binds[bindnum].x, m_pp.binds[bindnum].y, m_pp.binds[bindnum].z, m_pp.binds[bindnum].heading, 1);
 }
 
 void Client::GoToDeath() {
-	MovePC(m_pp.binds[0].zoneId, 0.0f, 0.0f, 0.0f, 0.0f, 1, ZoneToBindPoint);
+	MovePC(m_pp.binds[0].zoneId, m_pp.binds[0].instance_id, 0.0f, 0.0f, 0.0f, 0.0f, 1, ZoneToBindPoint);
 }
 
 void Client::SetZoneFlag(uint32 zone_id) {

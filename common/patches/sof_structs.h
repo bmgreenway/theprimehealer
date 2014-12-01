@@ -554,8 +554,8 @@ struct GMTrainee_Struct
 {
 	/*000*/ uint32 npcid;
 	/*004*/ uint32 playerid;
-	/*008*/ uint32 skills[73];
-	/*300*/ uint8 unknown300[148];
+	/*008*/ uint32 skills[PACKET_SKILL_ARRAY_SIZE];
+	/*408*/ uint8 unknown408[40];
 	/*448*/
 };
 
@@ -770,7 +770,7 @@ struct BindStruct {
 static const uint32 MAX_PP_LANGUAGE		= 25; //
 static const uint32 MAX_PP_SPELLBOOK	= 480; // Confirmed 60 pages on Live now
 static const uint32 MAX_PP_MEMSPELL		= 10; //was 9 now 10 on Live
-static const uint32 MAX_PP_SKILL		= _SkillPacketArraySize;	// 100 - actual skills buffer size
+static const uint32 MAX_PP_SKILL		= PACKET_SKILL_ARRAY_SIZE;	// 100 - actual skills buffer size
 static const uint32 MAX_PP_AA_ARRAY		= 300; //was 299
 static const uint32 MAX_GROUP_MEMBERS	= 6;
 static const uint32 MAX_RECAST_TYPES	= 20;
@@ -3789,7 +3789,7 @@ struct ItemSerializationHeader
 	uint32 slot;
 	uint32 price;
 	uint32 merchant_slot; //1 if not a merchant item
-	uint32 unknown020; //0
+	uint32 scaled_value; //0
 	uint32 instance_id; //unique instance id if not merchant item, else is merchant slot
 	uint32 unknown028; //0
 	uint32 last_cast_time;	// Unix Time from PP of last cast for this recast type if recast delay > 0
@@ -4027,9 +4027,9 @@ struct ItemQuaternaryBodyStruct
 struct AugmentInfo_Struct
 {
 /*000*/ uint32	itemid;			// id of the solvent needed
-/*004*/ uint8	window;			// window to display the information in
-/*005*/ uint8	unknown005[71];	// total packet length 76, all the rest were always 00
-/*076*/
+/*004*/ uint32	window;			// window to display the information in
+/*008*/ char	augment_info[64];	// total packet length 76, all the rest were always 00
+/*072*/ uint32	unknown072;
 };
 
 struct VeteranRewardItem

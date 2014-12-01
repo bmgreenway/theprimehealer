@@ -478,7 +478,11 @@ struct CastSpell_Struct
 	uint32	spell_id;
 	uint32	inventoryslot; // slot for clicky item, 0xFFFF = normal cast
 	uint32	target_id;
-	uint8	cs_unknown[4];
+	uint32  cs_unknown1;
+	uint32  cs_unknown2;
+ 	float   y_pos;
+ 	float   x_pos;
+	float   z_pos;
 };
 
 struct SpellEffect_Struct
@@ -597,8 +601,8 @@ struct GMTrainee_Struct
 {
 	/*000*/ uint32 npcid;
 	/*004*/ uint32 playerid;
-	/*008*/ uint32 skills[73];
-	/*300*/ uint8 unknown300[148];
+	/*008*/ uint32 skills[PACKET_SKILL_ARRAY_SIZE];
+	/*408*/ uint8 unknown408[40];
 	/*448*/
 };
 
@@ -827,17 +831,18 @@ struct BindStruct {
 	/*008*/ float y;
 	/*012*/ float z;
 	/*016*/ float heading;
-	/*020*/
+	/*020*/ uint32 instance_id;
+	/*024*/
 };
 
 struct SuspendedMinion_Struct
 {
-	/*000*/	uint16	SpellID;
-	/*002*/	uint32	HP;
-	/*006*/	uint32	Mana;
-	/*010*/	SpellBuff_Struct	Buffs[BUFF_COUNT];
-	/*510*/	uint32	Items[_MaterialCount];
-	/*546*/	char	Name[64];
+	/*000*/	uint16 SpellID;
+	/*002*/	uint32 HP;
+	/*006*/	uint32 Mana;
+	/*010*/	SpellBuff_Struct Buffs[BUFF_COUNT];
+	/*510*/	uint32 Items[_MaterialCount];
+	/*546*/	char Name[64];
 	/*610*/
 };
 
@@ -854,7 +859,7 @@ static const uint32 MAX_PP_MEMSPELL = 9; // Set to latest client so functions ca
 static const uint32 MAX_PP_REF_SPELLBOOK = 480;	// Set for Player Profile size retain
 static const uint32 MAX_PP_REF_MEMSPELL = 9; // Set for Player Profile size retain
 
-static const uint32 MAX_PP_SKILL		= _SkillPacketArraySize;	// 100 - actual skills buffer size
+static const uint32 MAX_PP_SKILL		= PACKET_SKILL_ARRAY_SIZE;	// 100 - actual skills buffer size
 static const uint32 MAX_PP_AA_ARRAY		= 240;
 static const uint32 MAX_GROUP_MEMBERS	= 6;
 static const uint32 MAX_RECAST_TYPES	= 20;
@@ -2659,6 +2664,17 @@ struct Translocate_Struct {
 /*088*/	uint32	Complete;
 };
 
+struct PendingTranslocate_Struct
+{
+	uint32 zone_id;
+	uint16 instance_id;
+	float heading;
+	float x;
+	float y;
+	float z;
+	uint32 spell_id;
+};
+
 struct Sacrifice_Struct {
 /*000*/	uint32	CasterID;
 /*004*/	uint32	TargetID;
@@ -4379,14 +4395,14 @@ typedef struct {
 struct ControlBoat_Struct {
 /*000*/	uint32	boatId;			// entitylist id of the boat
 /*004*/	bool	TakeControl;	// 01 if taking control, 00 if releasing it
-/*007*/							// no idea what these last three bytes represent
+/*007*/	char	unknown[3];		// no idea what these last three bytes represent
 };
 
 struct AugmentInfo_Struct
 {
 /*000*/ uint32	itemid;			// id of the solvent needed
-/*004*/ uint8	window;			// window to display the information in
-/*005*/ uint8	unknown005[67];	// total packet length 72, all the rest were always 00
+/*004*/ uint32	window;			// window to display the information in
+/*008*/ char	augment_info[64];	// the reply has the text here
 /*072*/
 };
 
@@ -5205,17 +5221,17 @@ struct MercenaryMerchantResponse_Struct {
 };
 
 struct ServerLootItem_Struct {
-	uint32	item_id;
-	int16	equipSlot;
-	uint8	charges;
-	uint16	lootslot;
-	uint32 aug1;
-	uint32 aug2;
-	uint32 aug3;
-	uint32 aug4;
-	uint32 aug5;
-	uint8 minlevel;
-	uint8 maxlevel;
+	uint32	item_id;	  // uint32	item_id;
+	int16	equip_slot;	  // int16	equip_slot;
+	uint16	charges;	  // uint8	charges; 
+	uint16	lootslot;	  // uint16	lootslot;
+	uint32	aug_1;		  // uint32	aug_1;
+	uint32	aug_2;		  // uint32	aug_2;
+	uint32	aug_3;		  // uint32	aug_3;
+	uint32	aug_4;		  // uint32	aug_4;
+	uint32	aug_5;		  // uint32	aug_5;
+	uint8	min_level;		  // 
+	uint8	max_level;		  // 
 };
 
 //Found in client near a ref to the string:

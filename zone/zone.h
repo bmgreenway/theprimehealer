@@ -18,25 +18,13 @@
 #ifndef ZONE_H
 #define ZONE_H
 
-#include "../common/mutex.h"
-#include "../common/linked_list.h"
-#include "../common/types.h"
 #include "../common/eqtime.h"
-#include "../common/servertalk.h"
+#include "../common/linked_list.h"
 #include "../common/rulesys.h"
-#include "../common/eq_packet_structs.h"
-#include "../common/features.h"
-#include "spawngroup.h"
-//#include "mob.h"
-#include "zonedump.h"
-#include "spawn2.h"
-#include "tasks.h"
-#include "pathing.h"
+#include "../common/types.h"
 #include "qglobals.h"
-#include <unordered_map>
-
-class Map;
-class WaterMap;
+#include "spawn2.h"
+#include "spawngroup.h"
 
 struct ZonePoint
 {
@@ -78,12 +66,10 @@ struct item_tick_struct {
     std::string qglobal;
 };
 
-extern EntityList entity_list;
-class database;
+class Map;
+class WaterMap;
 class PathManager;
-struct SendAA_Struct;
-
-class database;
+extern EntityList entity_list;
 
 class Zone
 {
@@ -104,6 +90,7 @@ public:
 	inline const uint32	GetZoneID() const { return zoneid; }
 	inline const uint32	GetInstanceID() const { return instanceid; }
 	inline const uint16	GetInstanceVersion() const { return instanceversion; }
+	inline const bool IsInstancePersistent() const { return pers_instance; }
 	inline const uint8	GetZoneType() const { return zone_type; }
 
 	inline Timer* GetInstanceTimer() { return Instance_Timer; }
@@ -274,6 +261,7 @@ private:
 	uint32	zoneid;
 	uint32	instanceid;
 	uint16	instanceversion;
+	bool pers_instance;
 	char*	short_name;
 	char	file_name[16];
 	char*	long_name;

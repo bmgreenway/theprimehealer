@@ -235,6 +235,18 @@ namespace RoF
 		FINISH_ENCODE();
 	}
 
+	ENCODE(OP_AugmentInfo)
+	{
+		ENCODE_LENGTH_EXACT(AugmentInfo_Struct);
+		SETUP_DIRECT_ENCODE(AugmentInfo_Struct, structs::AugmentInfo_Struct);
+
+		OUT(itemid);
+		OUT(window);
+		strn0cpy(eq->augment_info, emu->augment_info, 64);
+
+		FINISH_ENCODE();
+	}
+
 	ENCODE(OP_Barter)
 	{
 		EQApplicationPacket *in = *p;
@@ -4807,6 +4819,7 @@ namespace RoF
 
 	char* SerializeItem(const ItemInst *inst, int16 slot_id_in, uint32 *length, uint8 depth)
 	{
+		int ornamentationAugtype = RuleI(Character, OrnamentationAugmentType);
 		uint8 null_term = 0;
 		bool stackable = inst->IsStackable();
 		uint32 merchant_slot = inst->GetMerchantSlot();
@@ -4816,7 +4829,7 @@ namespace RoF
 
 		std::stringstream ss(std::stringstream::in | std::stringstream::out | std::stringstream::binary);
 
-		const Item_Struct *item = inst->GetItem();
+		const Item_Struct *item = inst->GetUnscaledItem();
 		//_log(NET__ERROR, "Serialize called for: %s", item->Name);
 
 		RoF::structs::ItemSerializationHeader hdr;
@@ -4838,7 +4851,7 @@ namespace RoF
 		hdr.price = inst->GetPrice();
 		hdr.merchant_slot = (merchant_slot == 0) ? 1 : inst->GetMerchantCount();
 		//hdr.merchant_slot = (merchant_slot == 0) ? 1 : 0xffffffff;
-		hdr.unknown020 = 0;
+		hdr.scaled_value = inst->IsScaling() ? inst->GetExp() / 100 : 0;
 		hdr.instance_id = (merchant_slot == 0) ? inst->GetSerialNumber() : merchant_slot;
 		hdr.unknown028 = 0;
 		hdr.last_cast_time = ((item->RecastDelay > 1) ? 1212693140 : 0);
@@ -4847,20 +4860,62 @@ namespace RoF
 		hdr.unknown044 = 0;
 		hdr.unknown048 = 0;
 		hdr.unknown052 = 0;
-		hdr.unknown056 = 0;
-		hdr.unknown060 = 0;
-		hdr.unknown061 = 0;
-		hdr.unknown062 = 0;
-		hdr.unknowna1 = 0xffffffff;
-		hdr.unknowna2 = 0;
-		hdr.unknown063 = 0;
-		hdr.unknowna3 = 0;
-		hdr.unknowna4 = 0xffffffff;
-		hdr.unknowna5 = 0;
-		hdr.ItemClass = item->ItemClass;
-
+		hdr.isEvolving = item->EvolvingLevel > 0 ? 1 : 0;
 		ss.write((const char*)&hdr, sizeof(RoF::structs::ItemSerializationHeader));
 
+		if (item->EvolvingLevel > 0) {
+			RoF::structs::EvolvingItem evotop;
+			evotop.unknown001 = 0;
+			evotop.unknown002 = 0;
+			evotop.unknown003 = 0;
+			evotop.unknown004 = 0;
+			evotop.evoLevel = item->EvolvingLevel;
+			evotop.progress = 95.512;
+			evotop.Activated = 1;
+			evotop.evomaxlevel = 7;
+			ss.write((const char*)&evotop, sizeof(RoF::structs::EvolvingItem));
+		}
+		//ORNAMENT IDFILE / ICON
+		uint16 ornaIcon = 0;
+		if (inst->GetOrnamentationAug(ornamentationAugtype)) {
+			const Item_Struct *aug_weap = inst->GetOrnamentationAug(ornamentationAugtype)->GetItem();
+			//Mainhand
+			ss.write(aug_weap->IDFile, strlen(aug_weap->IDFile));
+			ss.write((const char*)&null_term, sizeof(uint8));
+			//Offhand
+			ss.write(aug_weap->IDFile, strlen(aug_weap->IDFile));
+			ss.write((const char*)&null_term, sizeof(uint8));
+			//Icon
+			ornaIcon = aug_weap->Icon;
+		}
+		else if (inst->GetOrnamentationIDFile() && inst->GetOrnamentationIcon()) {
+			char tmp[30]; memset(tmp, 0x0, 30); sprintf(tmp, "IT%d", inst->GetOrnamentationIDFile());
+			//Mainhand
+			ss.write(tmp, strlen(tmp));
+			ss.write((const char*)&null_term, sizeof(uint8));
+			//Offhand
+			ss.write(tmp, strlen(tmp));
+			ss.write((const char*)&null_term, sizeof(uint8));
+			ornaIcon = inst->GetOrnamentationIcon();
+		}
+		else {
+			ss.write((const char*)&null_term, sizeof(uint8)); //no mh
+			ss.write((const char*)&null_term, sizeof(uint8));//no of
+		}
+
+		RoF::structs::ItemSerializationHeaderFinish hdrf;
+		hdrf.ornamentIcon = ornaIcon;
+		hdrf.unknown061 = 0;
+		hdrf.unknown062 = 0;
+		hdrf.unknowna1 = 0xffffffff;
+		hdrf.unknowna2 = 0;
+		hdrf.unknown063 = 0;
+		hdrf.unknowna3 = 0;
+		hdrf.unknowna4 = 0xffffffff;
+		hdrf.unknowna5 = 0;
+		hdrf.ItemClass = item->ItemClass;
+		ss.write((const char*)&hdrf, sizeof(RoF::structs::ItemSerializationHeaderFinish));
+		
 		if (strlen(item->Name) > 0)
 		{
 			ss.write(item->Name, strlen(item->Name));
@@ -4976,6 +5031,7 @@ namespace RoF
 		ibs.SpellShield = item->SpellShield;
 		ibs.Avoidance = item->Avoidance;
 		ibs.Accuracy = item->Accuracy;
+		ibs.CharmFileID = item->CharmFileID;
 		ibs.FactionAmt1 = item->FactionAmt1;
 		ibs.FactionMod1 = item->FactionMod1;
 		ibs.FactionAmt2 = item->FactionAmt2;

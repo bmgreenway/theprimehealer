@@ -19,7 +19,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <ctype.h>
 #include <string.h>
 #include <iostream>
 
@@ -30,19 +29,16 @@
 #include "../common/unix.h"
 #endif
 
-#include "net.h"
-#include "masterentity.h"
-#include "worldserver.h"
-#include "../common/guilds.h"
-#include "../common/packet_dump.h"
-#include "../common/packet_functions.h"
-#include "petitions.h"
-#include "../common/spdat.h"
 #include "../common/features.h"
-#include "string_ids.h"
+#include "../common/guilds.h"
+#include "../common/spdat.h"
 #include "guild_mgr.h"
-#include "raids.h"
+#include "net.h"
+#include "petitions.h"
 #include "quest_parser_collection.h"
+#include "raids.h"
+#include "string_ids.h"
+#include "worldserver.h"
 
 #ifdef _WINDOWS
 	#define snprintf	_snprintf
@@ -63,6 +59,7 @@ extern uint16 adverrornum;
 Entity::Entity()
 {
 	id = 0;
+	spawn_timestamp = time(nullptr);
 }
 
 Entity::~Entity()
@@ -1605,7 +1602,7 @@ Corpse *EntityList::GetCorpseByDBID(uint32 dbid)
 {
 	auto it = corpse_list.begin();
 	while (it != corpse_list.end()) {
-		if (it->second->GetDBID() == dbid)
+		if (it->second->GetCorpseDBID() == dbid)
 			return it->second;
 		++it;
 	}
@@ -1659,7 +1656,7 @@ void EntityList::RemoveCorpseByDBID(uint32 dbid)
 {
 	auto it = corpse_list.begin();
 	while (it != corpse_list.end()) {
-		if (it->second->GetDBID() == dbid) {
+		if (it->second->GetCorpseDBID() == dbid) {
 			safe_delete(it->second);
 			free_ids.push(it->first);
 			it = corpse_list.erase(it);
@@ -1676,9 +1673,9 @@ int EntityList::RezzAllCorpsesByCharID(uint32 charid)
 	auto it = corpse_list.begin();
 	while (it != corpse_list.end()) {
 		if (it->second->GetCharID() == charid) {
-			RezzExp += it->second->GetRezzExp();
-			it->second->Rezzed(true);
-			it->second->CompleteRezz();
+			RezzExp += it->second->GetRezExp();
+			it->second->IsRezzed(true);
+			it->second->CompleteResurrection();
 		}
 		++it;
 	}
@@ -2654,7 +2651,7 @@ int32 EntityList::DeleteNPCCorpses()
 	auto it = corpse_list.begin();
 	while (it != corpse_list.end()) {
 		if (it->second->IsNPCCorpse()) {
-			it->second->Depop();
+			it->second->DepopNPCCorpse();
 			x++;
 		}
 		++it;
@@ -2934,8 +2931,14 @@ void EntityList::SignalMobsByNPCID(uint32 snpc, int signal_id)
 	}
 }
 
+bool tracking_compare(const std::pair<Mob *, float> &a, const std::pair<Mob *, float> &b)
+{
+	return a.first->GetSpawnTimeStamp() > b.first->GetSpawnTimeStamp();
+}
+
 bool EntityList::MakeTrackPacket(Client *client)
 {
+	std::list<std::pair<Mob *, float> > tracking_list;
 	uint32 distance = 0;
 	float MobDistance;
 
@@ -2950,60 +2953,43 @@ bool EntityList::MakeTrackPacket(Client *client)
 	if (distance < 300)
 		distance = 300;
 
-	uint32 spe= 0;
-	bool ret = false;
-
-	spe = mob_list.size() + 50;
-
-	uchar *buffer1 = new uchar[sizeof(Track_Struct)];
-	Track_Struct *track_ent = (Track_Struct*) buffer1;
-
-	uchar *buffer2 = new uchar[sizeof(Track_Struct)*spe];
-	Tracking_Struct *track_array = (Tracking_Struct*) buffer2;
-	memset(track_array, 0, sizeof(Track_Struct)*spe);
-
-	uint32 array_counter = 0;
-
 	Group *g = client->GetGroup();
 
-	auto it = mob_list.begin();
-	while (it != mob_list.end()) {
-		if (it->second && ((MobDistance = it->second->DistNoZ(*client)) <= distance)) {
-			if ((it->second != client) && it->second->IsTrackable()) {
-				memset(track_ent, 0, sizeof(Track_Struct));
-				Mob *cur_entity = it->second;
-				track_ent->entityid = cur_entity->GetID();
-				track_ent->distance = MobDistance;
-				track_ent->level = cur_entity->GetLevel();
-				track_ent->NPC = !cur_entity->IsClient();
-				if (g && cur_entity->IsClient() && g->IsGroupMember(cur_entity->CastToMob()))
-					track_ent->GroupMember = 1;
-				else
-					track_ent->GroupMember = 0;
-				strn0cpy(track_ent->name, cur_entity->GetName(), sizeof(track_ent->name));
-				memcpy(&track_array->Entrys[array_counter], track_ent, sizeof(Track_Struct));
-				array_counter++;
-			}
-		}
+	for (auto it = mob_list.cbegin(); it != mob_list.cend(); ++it) {
+		if (!it->second || it->second == client || !it->second->IsTrackable() ||
+				it->second->IsInvisible(client))
+			continue;
 
-		++it;
+		MobDistance = it->second->DistNoZ(*client);
+		if (MobDistance > distance)
+			continue;
+
+		tracking_list.push_back(std::make_pair(it->second, MobDistance));
 	}
 
-	if (array_counter <= spe) {
-		EQApplicationPacket* outapp = new EQApplicationPacket(OP_Track,sizeof(Track_Struct)*(array_counter));
-		memcpy(outapp->pBuffer, track_array,sizeof(Track_Struct)*(array_counter));
-		outapp->priority = 6;
-		client->QueuePacket(outapp);
-		safe_delete(outapp);
-		ret = true;
-	} else {
-		LogFile->write(EQEMuLog::Status, "ERROR: Unable to transmit a Tracking_Struct packet. Mobs in zone = %i. Mobs in packet = %i", array_counter, spe);
+	tracking_list.sort(tracking_compare);
+	EQApplicationPacket *outapp = new EQApplicationPacket(OP_Track, sizeof(Track_Struct) * tracking_list.size());
+	Tracking_Struct *outtrack = (Tracking_Struct *)outapp->pBuffer;
+	outapp->priority = 6;
+
+	int index = 0;
+	for (auto it = tracking_list.cbegin(); it != tracking_list.cend(); ++it, ++index) {
+		Mob *cur_entity = it->first;
+		outtrack->Entrys[index].entityid = cur_entity->GetID();
+		outtrack->Entrys[index].distance = it->second;
+		outtrack->Entrys[index].level = cur_entity->GetLevel();
+		outtrack->Entrys[index].NPC = !cur_entity->IsClient();
+		if (g && cur_entity->IsClient() && g->IsGroupMember(cur_entity->CastToMob()))
+			outtrack->Entrys[index].GroupMember = 1;
+		else
+			outtrack->Entrys[index].GroupMember = 0;
+		strn0cpy(outtrack->Entrys[index].name, cur_entity->GetName(), sizeof(outtrack->Entrys[index].name));
 	}
 
-	safe_delete_array(buffer1);
-	safe_delete_array(buffer2);
+	client->QueuePacket(outapp);
+	safe_delete(outapp);
 
-	return ret;
+	return true;
 }
 
 void EntityList::MessageGroup(Mob *sender, bool skipclose, uint32 type, const char *message, ...)
@@ -3627,6 +3613,43 @@ void EntityList::DestroyTempPets(Mob *owner)
 		if (n->GetSwarmInfo()) {
 			if (n->GetSwarmInfo()->owner_id == owner->GetID()) {
 				n->Depop();
+			}
+		}
+		++it;
+	}
+}
+
+int16 EntityList::CountTempPets(Mob *owner)
+{
+	int16 count = 0;
+	auto it = npc_list.begin();
+	while (it != npc_list.end()) {
+		NPC* n = it->second;
+		if (n->GetSwarmInfo()) {
+			if (n->GetSwarmInfo()->owner_id == owner->GetID()) {
+				count++;
+			}
+		}
+		++it;
+	}
+	
+	owner->SetTempPetCount(count);
+
+	return count;
+}
+
+void EntityList::AddTempPetsToHateList(Mob *owner, Mob* other, bool bFrenzy)
+{
+	if (!other || !owner)
+		return;
+
+	auto it = npc_list.begin();
+	while (it != npc_list.end()) {
+		NPC* n = it->second;
+		if (n->GetSwarmInfo()) {
+			if (n->GetSwarmInfo()->owner_id == owner->GetID()) {
+				if (!n->GetSpecialAbility(IMMUNE_AGGRO))
+					n->hate_list.Add(other, 0, 0, bFrenzy);
 			}
 		}
 		++it;
@@ -4612,42 +4635,49 @@ Client *EntityList::FindCorpseDragger(uint16 CorpseID)
 	return nullptr;
 }
 
-Mob *EntityList::GetTargetForVirus(Mob *spreader)
+Mob *EntityList::GetTargetForVirus(Mob *spreader, int range)
 {
 	int max_spread_range = RuleI(Spells, VirusSpreadDistance);
+
+	if (range)
+		max_spread_range = range;
 
 	std::vector<Mob *> TargetsInRange;
 
 	auto it = mob_list.begin();
 	while (it != mob_list.end()) {
+		Mob *cur = it->second;
 		// Make sure the target is in range, has los and is not the mob doing the spreading
-		if ((it->second->GetID() != spreader->GetID()) &&
-				(it->second->CalculateDistance(spreader->GetX(), spreader->GetY(),
+		if ((cur->GetID() != spreader->GetID()) &&
+				(cur->CalculateDistance(spreader->GetX(), spreader->GetY(),
 					spreader->GetZ()) <= max_spread_range) &&
-				(spreader->CheckLosFN(it->second))) {
+				(spreader->CheckLosFN(cur))) {
 			// If the spreader is an npc it can only spread to other npc controlled mobs
-			if (spreader->IsNPC() && !spreader->IsPet() && it->second->IsNPC()) {
-				TargetsInRange.push_back(it->second);
+			if (spreader->IsNPC() && !spreader->IsPet() && !spreader->CastToNPC()->GetSwarmOwner() && cur->IsNPC()) {
+				TargetsInRange.push_back(cur);
 			}
 			// If the spreader is an npc controlled pet it can spread to any other npc or an npc controlled pet
 			else if (spreader->IsNPC() && spreader->IsPet() && spreader->GetOwner()->IsNPC()) {
-				if (it->second->IsNPC() && !it->second->IsPet()) {
-					TargetsInRange.push_back(it->second);
-				} else if (it->second->IsNPC() && it->second->IsPet() && it->second->GetOwner()->IsNPC()) {
-					TargetsInRange.push_back(it->second);
+				if (cur->IsNPC() && !cur->IsPet()) {
+					TargetsInRange.push_back(cur);
+				} else if (cur->IsNPC() && cur->IsPet() && cur->GetOwner()->IsNPC()) {
+					TargetsInRange.push_back(cur);
+				}
+				else if (cur->IsNPC() && cur->CastToNPC()->GetSwarmOwner() && cur->GetOwner()->IsNPC()) {
+					TargetsInRange.push_back(cur);
 				}
 			}
 			// if the spreader is anything else(bot, pet, etc) then it should spread to everything but non client controlled npcs
-			else if (!spreader->IsNPC() && !it->second->IsNPC()) {
-				TargetsInRange.push_back(it->second);
+			else if (!spreader->IsNPC() && !cur->IsNPC()) {
+				TargetsInRange.push_back(cur);
 			}
 			// if its a pet we need to determine appropriate targets(pet to client, pet to pet, pet to bot, etc)
-			else if (spreader->IsNPC() && spreader->IsPet() && !spreader->GetOwner()->IsNPC()) {
-				if (!it->second->IsNPC()) {
-					TargetsInRange.push_back(it->second);
+			else if (spreader->IsNPC() && (spreader->IsPet() || spreader->CastToNPC()->GetSwarmOwner()) && !spreader->GetOwner()->IsNPC()) {
+				if (!cur->IsNPC()) {
+					TargetsInRange.push_back(cur);
 				}
-				else if (it->second->IsNPC() && it->second->IsPet() && !it->second->GetOwner()->IsNPC()) {
-					TargetsInRange.push_back(it->second);
+				else if (cur->IsNPC() && (cur->IsPet() || cur->CastToNPC()->GetSwarmOwner()) && !cur->GetOwner()->IsNPC()) {
+					TargetsInRange.push_back(cur);
 				}
 			}
 		}

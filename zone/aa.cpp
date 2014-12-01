@@ -16,84 +16,34 @@ Copyright (C) 2001-2004 EQEMu Development Team (http://eqemulator.net)
 	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-// Test 1
-
-#include <iostream>
-
-#include "../common/debug.h"
-#include "aa.h"
-#include "mob.h"
-#include "client.h"
-#include "groups.h"
-#include "raids.h"
-#include "../common/spdat.h"
-#include "object.h"
-#include "doors.h"
-#include "beacon.h"
-#include "corpse.h"
-#include "titles.h"
-#include "../common/races.h"
 #include "../common/classes.h"
+#include "../common/debug.h"
 #include "../common/eq_packet_structs.h"
 #include "../common/packet_dump.h"
+#include "../common/races.h"
+#include "../common/spdat.h"
 #include "../common/string_util.h"
-#include "../common/logsys.h"
-#include "zonedb.h"
-#include "string_ids.h"
+
+#include "aa.h"
+#include "client.h"
+#include "corpse.h"
+#include "groups.h"
+#include "mob.h"
 #include "queryserv.h"
+#include "raids.h"
+#include "string_ids.h"
+#include "titles.h"
+#include "zonedb.h"
 
 extern QueryServ* QServ;
 
-//static data arrays, really not big enough to warrant shared mem.
+
 AA_DBAction AA_Actions[aaHighestID][MAX_AA_ACTION_RANKS];	//[aaid][rank]
 std::map<uint32,SendAA_Struct*>aas_send;
 std::map<uint32, std::map<uint32, AA_Ability> > aa_effects;	//stores the effects from the aa_effects table in memory
 std::map<uint32, AALevelCost_Struct> AARequiredLevelAndCost;
 
-/*
 
-
-Schema:
-
-spell_id is spell to cast, SPELL_UNKNOWN == no spell
-nonspell_action is action to preform on activation which is not a spell, 0=none
-nonspell_mana is mana that the nonspell action consumes
-nonspell_duration is a duration which may be used by the nonspell action
-redux_aa is the aa which reduces the reuse timer of the skill
-redux_rate is the multiplier of redux_aa, as a percentage of total rate (10 == 10% faster)
-
-CREATE TABLE aa_actions (
-	aaid mediumint unsigned not null,
-	rank tinyint unsigned not null,
-	reuse_time mediumint unsigned not null,
-	spell_id mediumint unsigned not null,
-	target tinyint unsigned not null,
-	nonspell_action tinyint unsigned not null,
-	nonspell_mana mediumint unsigned not null,
-	nonspell_duration mediumint unsigned not null,
-	redux_aa mediumint unsigned not null,
-	redux_rate tinyint not null,
-
-	PRIMARY KEY(aaid, rank)
-);
-
-CREATE TABLE aa_swarmpets (
-	spell_id mediumint unsigned not null,
-	count tinyint unsigned not null,
-	npc_id int not null,
-	duration mediumint unsigned not null,
-	PRIMARY KEY(spell_id)
-);
-*/
-
-/*
-
-Credits for this function:
-	-FatherNitwit: Structure and mechanism
-	-Wiz: Initial set of AAs, original function contents
-	-Branks: Much updated info and a bunch of higher-numbered AAs
-
-*/
 int Client::GetAATimerID(aaID activate)
 {
 	SendAA_Struct* aa2 = zone->FindAA(activate);
@@ -542,10 +492,7 @@ void Client::HandleAAAction(aaID activate) {
 	}
 }
 
-
-//Originally written by Branks
-//functionality rewritten by Father Nitwit
-void Mob::TemporaryPets(uint16 spell_id, Mob *targ, const char *name_override, uint32 duration_override) {
+void Mob::TemporaryPets(uint16 spell_id, Mob *targ, const char *name_override, uint32 duration_override, bool followme, bool sticktarg) {
 
 	//It might not be a bad idea to put these into the database, eventually..
 
@@ -563,7 +510,7 @@ void Mob::TemporaryPets(uint16 spell_id, Mob *targ, const char *name_override, u
 	pet.count = 1;
 	pet.duration = 1;
 
-	for(int x = 0; x < 12; x++)
+	for(int x = 0; x < MAX_SWARM_PETS; x++)
 	{
 		if(spells[spell_id].effectid[x] == SE_TemporaryPets)
 		{
@@ -607,8 +554,6 @@ void Mob::TemporaryPets(uint16 spell_id, Mob *targ, const char *name_override, u
 	static const float swarm_pet_y[MAX_SWARM_PETS] = {	5, 5, -5, -5,
 														10, 10, -10, -10,
 														8, 8, -8, -8 };
-	TempPets(true);
-
 	while(summon_count > 0) {
 		int pet_duration = pet.duration;
 		if(duration_override > 0)
@@ -628,7 +573,7 @@ void Mob::TemporaryPets(uint16 spell_id, Mob *targ, const char *name_override, u
 				GetX()+swarm_pet_x[summon_count], GetY()+swarm_pet_y[summon_count],
 				GetZ(), GetHeading(), FlyMode3);
 
-		if((spell_id == 6882) || (spell_id == 6884))
+		if (followme)
 			npca->SetFollowID(GetID());
 
 		if(!npca->GetSwarmInfo()){
@@ -646,7 +591,10 @@ void Mob::TemporaryPets(uint16 spell_id, Mob *targ, const char *name_override, u
 		//give the pets somebody to "love"
 		if(targ != nullptr){
 			npca->AddToHateList(targ, 1000, 1000);
-			npca->GetSwarmInfo()->target = targ->GetID();
+			if (RuleB(Spells, SwarmPetTargetLock) || sticktarg)
+				npca->GetSwarmInfo()->target = targ->GetID();
+			else
+				npca->GetSwarmInfo()->target = 0;
 		}
 
 		//we allocated a new NPC type object, give the NPC ownership of that memory
@@ -662,7 +610,7 @@ void Mob::TemporaryPets(uint16 spell_id, Mob *targ, const char *name_override, u
 		targ->AddToHateList(this, 1, 0);
 }
 
-void Mob::TypesTemporaryPets(uint32 typesid, Mob *targ, const char *name_override, uint32 duration_override, bool followme) {
+void Mob::TypesTemporaryPets(uint32 typesid, Mob *targ, const char *name_override, uint32 duration_override, bool followme, bool sticktarg) {
 
 	AA_SwarmPet pet;
 	pet.count = 1;
@@ -700,7 +648,6 @@ void Mob::TypesTemporaryPets(uint32 typesid, Mob *targ, const char *name_overrid
 	static const float swarm_pet_y[MAX_SWARM_PETS] = {	5, 5, -5, -5,
 														10, 10, -10, -10,
 														8, 8, -8, -8 };
-	TempPets(true);
 
 	while(summon_count > 0) {
 		int pet_duration = pet.duration;
@@ -721,6 +668,9 @@ void Mob::TypesTemporaryPets(uint32 typesid, Mob *targ, const char *name_overrid
 				GetX()+swarm_pet_x[summon_count], GetY()+swarm_pet_y[summon_count],
 				GetZ(), GetHeading(), FlyMode3);
 
+		if (followme)
+			npca->SetFollowID(GetID());
+
 		if(!npca->GetSwarmInfo()){
 			AA_SwarmPetInfo* nSI = new AA_SwarmPetInfo;
 			npca->SetSwarmInfo(nSI);
@@ -736,7 +686,11 @@ void Mob::TypesTemporaryPets(uint32 typesid, Mob *targ, const char *name_overrid
 		//give the pets somebody to "love"
 		if(targ != nullptr){
 			npca->AddToHateList(targ, 1000, 1000);
-			npca->GetSwarmInfo()->target = targ->GetID();
+
+			if (RuleB(Spells, SwarmPetTargetLock) || sticktarg)
+				npca->GetSwarmInfo()->target = targ->GetID();
+			else
+				npca->GetSwarmInfo()->target = 0;
 		}
 
 		//we allocated a new NPC type object, give the NPC ownership of that memory
@@ -894,8 +848,6 @@ void Mob::WakeTheDead(uint16 spell_id, Mob *target, uint32 duration)
 	make_npc->merchanttype = 0;
 	make_npc->d_meele_texture1 = 0;
 	make_npc->d_meele_texture2 = 0;
-
-	TempPets(true);
 
 	NPC* npca = new NPC(make_npc, 0, GetX(), GetY(), GetZ(), GetHeading(), FlyMode3);
 
@@ -1902,7 +1854,7 @@ void ZoneDatabase::FillAAEffects(SendAA_Struct* aa_struct){
 
 	auto it = aa_effects.find(aa_struct->id);
 	if (it != aa_effects.end()) {
-		for (int slot = 0; slot < aa_struct->total_abilities; slot++) {
+		for (uint32 slot = 0; slot < aa_struct->total_abilities; slot++) {
 			// aa_effects is a map of a map, so the slot reference does not start at 0
 			aa_struct->abilities[slot].skill_id = it->second[slot + 1].skill_id;
 			aa_struct->abilities[slot].base1 = it->second[slot + 1].base1;

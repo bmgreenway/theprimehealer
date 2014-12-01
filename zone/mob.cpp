@@ -15,17 +15,17 @@
 	along with this program; if not, write to the Free Software
 	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
-#include "../common/debug.h"
-#include "masterentity.h"
+
 #include "../common/spdat.h"
-#include "string_ids.h"
-#include "worldserver.h"
-#include "quest_parser_collection.h"
 #include "../common/string_util.h"
 
-#include <sstream>
-#include <math.h>
+#include "quest_parser_collection.h"
+#include "string_ids.h"
+#include "worldserver.h"
+
 #include <limits.h>
+#include <math.h>
+#include <sstream>
 
 extern EntityList entity_list;
 
@@ -264,7 +264,7 @@ Mob::Mob(const char* in_name,
 	logging_enabled = false;
 	isgrouped = false;
 	israidgrouped = false;
-	islooting = false;
+	entity_id_being_looted = 0;
 	_appearance = eaStanding;
 	pRunAnimSpeed = 0;
 
@@ -300,6 +300,8 @@ Mob::Mob(const char* in_name,
 	held = false;
 	nocast = false;
 	focused = false;
+	_IsTempPet = false;
+	pet_owner_client = false;
 
 	attacked_count = 0;
 	mezzed = false;
@@ -360,7 +362,8 @@ Mob::Mob(const char* in_name,
 	nexthpevent = -1;
 	nextinchpevent = -1;
 
-	TempPets(false);
+	hasTempPet = false;
+	count_TempPet = 0;
 
 	m_is_running = false;
 
@@ -368,6 +371,10 @@ Mob::Mob(const char* in_name,
 	nimbus_effect2 = 0;
 	nimbus_effect3 = 0;
 	m_targetable = true;
+
+	targetring_x = 0.0f;
+	targetring_y = 0.0f; 
+	targetring_z = 0.0f;
 
 	flymode = FlyMode3;
 	// Pathing
@@ -387,6 +394,7 @@ Mob::Mob(const char* in_name,
 	for (int i = 0; i < HIGHEST_RESIST+2; i++) { Vulnerability_Mod[i] = 0; }
 
 	emoteid = 0;
+	endur_upkeep = false;
 }
 
 Mob::~Mob()
@@ -416,7 +424,7 @@ Mob::~Mob()
 		delete trade;
 	}
 
-	if(HadTempPets()){
+	if(HasTempPetsActive()){
 		entity_list.DestroyTempPets(this);
 	}
 	entity_list.UnMarkNPC(GetID());
@@ -1247,7 +1255,7 @@ void Mob::ShowStats(Client* client)
 	}
 	else if (IsCorpse()) {
 		if (IsPlayerCorpse()) {
-			client->Message(0, "  CharID: %i  PlayerCorpse: %i", CastToCorpse()->GetCharID(), CastToCorpse()->GetDBID());
+			client->Message(0, "  CharID: %i  PlayerCorpse: %i", CastToCorpse()->GetCharID(), CastToCorpse()->GetCorpseDBID());
 		}
 		else {
 			client->Message(0, "  NPCCorpse", GetID());
@@ -2430,7 +2438,7 @@ void Mob::WearChange(uint8 material_slot, uint16 texture, uint32 color)
 int32 Mob::GetEquipmentMaterial(uint8 material_slot) const
 {
 	const Item_Struct *item;
-
+	int ornamentationAugtype = RuleI(Character, OrnamentationAugmentType);
 	item = database.GetItem(GetEquipment(material_slot));
 	if(item != 0)
 	{
@@ -2440,10 +2448,29 @@ int32 Mob::GetEquipmentMaterial(uint8 material_slot) const
 			material_slot == MaterialSecondary
 		)
 		{
-			if(strlen(item->IDFile) > 2)
-				return atoi(&item->IDFile[2]);
-			else	//may as well try this, since were going to 0 anyways
-				return item->Material;
+			if (this->IsClient()){
+				int currMatslot = MaterialPrimary == material_slot ? MainPrimary : MainSecondary;
+				const ItemInst* inst = CastToClient()->m_inv[currMatslot];
+				if (inst && inst->GetOrnamentationAug(ornamentationAugtype)) {
+					item = inst->GetOrnamentationAug(ornamentationAugtype)->GetItem();
+					return atoi(&item->IDFile[2]);
+				}
+				else if (inst->GetOrnamentationIcon() && inst->GetOrnamentationIDFile()) {
+					return inst->GetOrnamentationIDFile();
+				}
+				else {
+					if (strlen(item->IDFile) > 2)
+						return atoi(&item->IDFile[2]);
+					else	//may as well try this, since were going to 0 anyways
+						return item->Material;
+				}
+			}
+			else {
+				if (strlen(item->IDFile) > 2)
+					return atoi(&item->IDFile[2]);
+				else	//may as well try this, since were going to 0 anyways
+					return item->Material;
+			}
 		}
 		else
 		{
@@ -3035,7 +3062,7 @@ void Mob::TriggerOnCast(uint32 focus_spell, uint32 spell_id, bool aa_trigger)
 
 		if(IsValidSpell(trigger_spell_id) && GetTarget()){
 			SpellFinished(trigger_spell_id, GetTarget(),10, 0, -1, spells[trigger_spell_id].ResistDiff);
-			CheckNumHitsRemaining(NUMHIT_MatchingSpells,0, focus_spell);
+			CheckNumHitsRemaining(NUMHIT_MatchingSpells,-1, focus_spell);
 		}
 	}
 }
@@ -3372,7 +3399,7 @@ void Mob::TrySympatheticProc(Mob *target, uint32 spell_id)
 					SpellFinished(focus_trigger, target, 10, 0, -1, spells[focus_trigger].ResistDiff);
 			}
 
-			CheckNumHitsRemaining(NUMHIT_MatchingSpells, 0, focus_spell);
+			CheckNumHitsRemaining(NUMHIT_MatchingSpells, -1, focus_spell);
 		}
 }
 
@@ -3392,7 +3419,7 @@ int32 Mob::GetItemStat(uint32 itemid, const char *identifier)
 	int32 stat = 0;
 
 	std::string id = identifier;
-	for(int i = 0; i < id.length(); ++i)
+	for(uint32 i = 0; i < id.length(); ++i)
 	{
 		id[i] = tolower(id[i]);
 	}
@@ -4179,7 +4206,7 @@ int16 Mob::GetSkillDmgAmt(uint16 skill)
 
 void Mob::MeleeLifeTap(int32 damage) {
 
-	int16 lifetap_amt = 0;
+	int32 lifetap_amt = 0;
 	lifetap_amt = spellbonuses.MeleeLifetap + itembonuses.MeleeLifetap + aabonuses.MeleeLifetap
 				+ spellbonuses.Vampirism + itembonuses.Vampirism + aabonuses.Vampirism;
 
@@ -4223,10 +4250,10 @@ void Mob::SpellProjectileEffect()
 		float dist = 0;
 
 		if (target)
-				dist = target->CalculateDistance(projectile_x[i], projectile_y[i],  projectile_z[i]);
+			dist = target->CalculateDistance(projectile_x[i], projectile_y[i],  projectile_z[i]);
 
 		int increment_end = 0;
-		increment_end = (dist / 10) - 1; //This pretty accurately determines end time for speed for 1.5 and timer of 250 ms
+		increment_end = static_cast<int>(dist / 10) - 1; //This pretty accurately determines end time for speed for 1.5 and timer of 250 ms
 
 		if (increment_end <= projectile_increment[i]){
 
@@ -4349,7 +4376,7 @@ void Mob::SpreadVirus(uint16 spell_id, uint16 casterID)
 	// Only spread in zones without perm buffs
 	if(!zone->BuffTimersSuspended()) {
 		for(int i = 0; i < num_targs; i++) {
-			target = entity_list.GetTargetForVirus(this);
+			target = entity_list.GetTargetForVirus(this, spells[spell_id].viral_range);
 			if(target) {
 				// Only spreads to the uninfected
 				if(!target->FindBuff(spell_id)) {
@@ -4829,7 +4856,7 @@ bool Mob::HasSpellEffect(int effectid)
 {
     int i;
 
-    uint32 buff_count = GetMaxTotalSlots();
+    int buff_count = GetMaxTotalSlots();
     for(i = 0; i < buff_count; i++)
     {
         if(buffs[i].spellid == SPELL_UNKNOWN) { continue; }
@@ -4960,7 +4987,7 @@ bool Mob::IsFacingMob(Mob *other)
 		return false;
 	float angle = HeadingAngleToMob(other);
 	// what the client uses appears to be 2x our internal heading
-	float heading = GetHeading() * 2.0;
+	float heading = GetHeading() * 2.0f;
 
 	if (angle > 472.0 && heading < 40.0)
 		angle = heading;
@@ -4986,20 +5013,20 @@ float Mob::HeadingAngleToMob(Mob *other)
 	if (y_diff < 0.0000009999999974752427)
 		y_diff = 0.0000009999999974752427;
 
-	float angle = atan2(x_diff, y_diff) * 180.0 * 0.3183099014828645; // angle, nice "pi"
+	float angle = atan2(x_diff, y_diff) * 180.0f * 0.3183099014828645f; // angle, nice "pi"
 
 	// return the right thing based on relative quadrant
 	// I'm sure this could be improved for readability, but whatever
 	if (this_y >= mob_y) {
 		if (mob_x >= this_x)
-			return (90.0 - angle + 90.0) * 511.5 * 0.0027777778;
+			return (90.0f - angle + 90.0f) * 511.5f * 0.0027777778f;
 		if (mob_x <= this_x)
-			return (angle + 180.0) * 511.5 * 0.0027777778;
+			return (angle + 180.0f) * 511.5f * 0.0027777778f;
 	}
 	if (this_y > mob_y || mob_x > this_x)
-		return angle * 511.5 * 0.0027777778;
+		return angle * 511.5f * 0.0027777778f;
 	else
-		return (90.0 - angle + 270.0) * 511.5 * 0.0027777778;
+		return (90.0f - angle + 270.0f) * 511.5f * 0.0027777778f;
 }
 
 int32 Mob::GetSpellStat(uint32 spell_id, const char *identifier, uint8 slot)
@@ -5016,7 +5043,7 @@ int32 Mob::GetSpellStat(uint32 spell_id, const char *identifier, uint8 slot)
 		slot = slot - 1;
 
 	std::string id = identifier;
-	for(int i = 0; i < id.length(); ++i)
+	for(uint32 i = 0; i < id.length(); ++i)
 	{
 		id[i] = tolower(id[i]);
 	}
@@ -5040,10 +5067,10 @@ int32 Mob::GetSpellStat(uint32 spell_id, const char *identifier, uint8 slot)
 		else if (id == "NoexpendReagent") {spells[spell_id].NoexpendReagent[slot];}
 	}
 
-	if (id == "range") {stat = spells[spell_id].range; }
-	else if (id == "aoerange") {stat = spells[spell_id].aoerange;}
-	else if (id == "pushback") {stat = spells[spell_id].pushback;}
-	else if (id == "pushup") {stat = spells[spell_id].pushup;}
+	if (id == "range") {stat = static_cast<int32>(spells[spell_id].range); }
+	else if (id == "aoerange") {stat = static_cast<int32>(spells[spell_id].aoerange);}
+	else if (id == "pushback") {stat = static_cast<int32>(spells[spell_id].pushback);}
+	else if (id == "pushup") {stat = static_cast<int32>(spells[spell_id].pushup);}
 	else if (id == "cast_time") {stat = spells[spell_id].cast_time;}
 	else if (id == "recovery_time") {stat = spells[spell_id].recovery_time;}
 	else if (id == "recast_time") {stat = spells[spell_id].recast_time;}
@@ -5094,8 +5121,8 @@ int32 Mob::GetSpellStat(uint32 spell_id, const char *identifier, uint8 slot)
 	else if (id == "viral_targets") {stat = spells[spell_id].viral_targets; }
 	else if (id == "viral_timer") {stat = spells[spell_id].viral_timer; }
 	else if (id == "NimbusEffect") {stat = spells[spell_id].NimbusEffect; }
-	else if (id == "directional_start") {stat = spells[spell_id].directional_start; }
-	else if (id == "directional_end") {stat = spells[spell_id].directional_end; }
+	else if (id == "directional_start") {stat = static_cast<int32>(spells[spell_id].directional_start); }
+	else if (id == "directional_end") {stat = static_cast<int32>(spells[spell_id].directional_end); }
 	else if (id == "not_extendable") {stat = spells[spell_id].not_extendable; }
 	else if (id == "suspendable") {stat = spells[spell_id].suspendable; }
 	else if (id == "viral_range") {stat = spells[spell_id].viral_range; }
@@ -5109,10 +5136,10 @@ int32 Mob::GetSpellStat(uint32 spell_id, const char *identifier, uint8 slot)
 	else if (id == "aemaxtargets") {stat = spells[spell_id].aemaxtargets; }
 	else if (id == "maxtargets") {stat = spells[spell_id].maxtargets; }
 	else if (id == "persistdeath") {stat = spells[spell_id].persistdeath; }
-	else if (id == "min_dist") {stat = spells[spell_id].min_dist; }
-	else if (id == "min_dist_mod") {stat = spells[spell_id].min_dist_mod; }
-	else if (id == "max_dist") {stat = spells[spell_id].max_dist; }
-	else if (id == "min_range") {stat = spells[spell_id].min_range; }
+	else if (id == "min_dist") {stat = static_cast<int32>(spells[spell_id].min_dist); }
+	else if (id == "min_dist_mod") {stat = static_cast<int32>(spells[spell_id].min_dist_mod); }
+	else if (id == "max_dist") {stat = static_cast<int32>(spells[spell_id].max_dist); }
+	else if (id == "min_range") {stat = static_cast<int32>(spells[spell_id].min_range); }
 	else if (id == "DamageShieldType") {stat = spells[spell_id].DamageShieldType; }
 	
 	return stat;

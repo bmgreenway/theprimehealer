@@ -54,10 +54,10 @@ void Adventure::AddPlayer(std::string character_name, bool add_client_to_instanc
 {
 	if(!PlayerExists(character_name))
 	{
-		int client_id = database.GetCharacterID(character_name.c_str());
-		if(add_client_to_instance)
+		int32 character_id = database.GetCharacterID(character_name.c_str());
+		if(character_id && add_client_to_instance)
 		{
-			database.AddClientToInstance(instance_id, client_id);
+			database.AddClientToInstance(instance_id, character_id);
 		}
 		players.push_back(character_name);
 	}
@@ -70,8 +70,12 @@ void Adventure::RemovePlayer(std::string character_name)
 	{
 		if((*iter).compare(character_name) == 0)
 		{
-			database.RemoveClientFromInstance(instance_id, database.GetCharacterID(character_name.c_str()));
-			players.erase(iter);
+			int32 character_id = database.GetCharacterID(character_name.c_str());
+			if (character_id)
+			{
+				database.RemoveClientFromInstance(instance_id, character_id);
+				players.erase(iter);
+			}
 			return;
 		}
 		++iter;
@@ -376,7 +380,7 @@ void Adventure::MoveCorpsesToGraveyard()
 	std::list<uint32> dbid_list;
 	std::list<uint32> charid_list;
 
-	std::string query = StringFormat("SELECT id, charid FROM player_corpses WHERE instanceid=%d", GetInstanceID());
+	std::string query = StringFormat("SELECT id, charid FROM character_corpses WHERE instanceid=%d", GetInstanceID());
 	auto results = database.QueryDatabase(query);
 	if(!results.Success())
         LogFile->write(EQEMuLog::Error, "Error in AdventureManager:::MoveCorpsesToGraveyard: %s (%s)", query.c_str(), results.ErrorMessage().c_str());
@@ -392,7 +396,7 @@ void Adventure::MoveCorpsesToGraveyard()
 		float y = GetTemplate()->graveyard_y + MakeRandomFloat(-GetTemplate()->graveyard_radius, GetTemplate()->graveyard_radius);
 		float z = GetTemplate()->graveyard_z;
 
-		query = StringFormat("UPDATE player_corpses "
+		query = StringFormat("UPDATE character_corpses "
                             "SET zoneid = %d, instanceid = 0, "
                             "x = %f, y = %f, z = %f WHERE instanceid = %d",
                             GetTemplate()->graveyard_zone_id,

@@ -24,17 +24,14 @@
 #include <netinet/in.h>	//for htonl
 #endif
 
-#include "masterentity.h"
-#include "zonedb.h"
-#include "../common/packet_functions.h"
-#include "../common/packet_dump.h"
-#include "titles.h"
-#include "string_ids.h"
 #include "../common/misc_functions.h"
-#include "../common/string_util.h"
 #include "../common/rulesys.h"
-#include "quest_parser_collection.h"
+#include "../common/string_util.h"
 #include "queryserv.h"
+#include "quest_parser_collection.h"
+#include "string_ids.h"
+#include "titles.h"
+#include "zonedb.h"
 
 extern QueryServ* QServ;
 
@@ -283,6 +280,44 @@ void Object::HandleCombine(Client* user, const NewCombine_Struct* in_combine, Ob
 	}
 
 	container = inst;
+	if (container->GetItem() && container->GetItem()->BagType == BagTypeTransformationmold) {
+		const ItemInst* inst = container->GetItem(0);
+		bool AllowAll = RuleB(Inventory, AllowAnyWeaponTransformation);
+		if (inst && ItemInst::CanTransform(inst->GetItem(), container->GetItem(), AllowAll)) {
+			const Item_Struct* new_weapon = inst->GetItem();
+			user->DeleteItemInInventory(Inventory::CalcSlotId(in_combine->container_slot, 0), 0, true);
+			container->Clear();
+			user->SummonItem(new_weapon->ID, inst->GetCharges(), inst->GetAugmentItemID(0), inst->GetAugmentItemID(1), inst->GetAugmentItemID(2), inst->GetAugmentItemID(3), inst->GetAugmentItemID(4), inst->IsInstNoDrop(), MainCursor, container->GetItem()->Icon, atoi(container->GetItem()->IDFile + 2));
+			user->Message_StringID(4, TRANSFORM_COMPLETE, inst->GetItem()->Name);
+			if (RuleB(Inventory, DeleteTransformationMold))
+				user->DeleteItemInInventory(in_combine->container_slot, 0, true);
+		}
+		else if (inst) {
+			user->Message_StringID(4, TRANSFORM_FAILED, inst->GetItem()->Name);
+		}
+		EQApplicationPacket* outapp = new EQApplicationPacket(OP_TradeSkillCombine, 0);
+		user->QueuePacket(outapp);
+		safe_delete(outapp);
+		return;
+	}
+
+	if (container->GetItem() && container->GetItem()->BagType == BagTypeDetransformationmold) {
+		const ItemInst* inst = container->GetItem(0);
+		if (inst && inst->GetOrnamentationIcon() && inst->GetOrnamentationIcon()) {
+			const Item_Struct* new_weapon = inst->GetItem();
+			user->DeleteItemInInventory(Inventory::CalcSlotId(in_combine->container_slot, 0), 0, true);
+			container->Clear();
+			user->SummonItem(new_weapon->ID, inst->GetCharges(), inst->GetAugmentItemID(0), inst->GetAugmentItemID(1), inst->GetAugmentItemID(2), inst->GetAugmentItemID(3), inst->GetAugmentItemID(4), inst->IsInstNoDrop(), MainCursor, 0, 0);
+			user->Message_StringID(4, TRANSFORM_COMPLETE, inst->GetItem()->Name);
+		}
+		else if (inst) {
+			user->Message_StringID(4, DETRANSFORM_FAILED, inst->GetItem()->Name);
+		}
+		EQApplicationPacket* outapp = new EQApplicationPacket(OP_TradeSkillCombine, 0);
+		user->QueuePacket(outapp);
+		safe_delete(outapp);
+		return;
+	}
 
 	DBTradeskillRecipe_Struct spec;
 	if (!database.GetTradeRecipe(container, c_type, some_id, user->CharacterID(), &spec)) {
@@ -1226,7 +1261,7 @@ bool ZoneDatabase::GetTradeRecipe(const ItemInst* container, uint8 c_type, uint3
                             "WHERE tre.recipe_id IN (%s) "
                             "GROUP BY tre.recipe_id HAVING sum(tre.componentcount) = %u "
                             "AND sum(tre.item_id * tre.componentcount) = %u", buf2.c_str(), count, sum);
-        auto results = QueryDatabase(query);
+		results = QueryDatabase(query);
         if (!results.Success()) {
             LogFile->write(EQEMuLog::Error, "Error in GetTradeRecipe, re-query: %s", query.c_str());
             LogFile->write(EQEMuLog::Error, "Error in GetTradeRecipe, error: %s", results.ErrorMessage().c_str());

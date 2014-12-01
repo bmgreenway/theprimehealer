@@ -112,7 +112,7 @@ static const uint32 MAX_NUMBER_GUILDS = 1500;
 static const uint32 MAX_PP_LANGUAGE		= 32;	// was 25
 static const uint32 MAX_PP_SPELLBOOK	= 720;	// was 480
 static const uint32 MAX_PP_MEMSPELL		= 16;	// was 12
-static const uint32 MAX_PP_SKILL		= _SkillPacketArraySize;	// 100 - actual skills buffer size
+static const uint32 MAX_PP_SKILL		= PACKET_SKILL_ARRAY_SIZE;	// 100 - actual skills buffer size
 static const uint32 MAX_PP_AA_ARRAY		= 300;
 static const uint32 MAX_PP_DISCIPLINES	= 200;	// was 100
 static const uint32 MAX_GROUP_MEMBERS	= 6;
@@ -767,8 +767,8 @@ struct GMTrainee_Struct
 {
 	/*000*/ uint32 npcid;
 	/*004*/ uint32 playerid;
-	/*008*/ uint32 skills[73];
-	/*300*/ uint8 unknown300[148];
+	/*008*/ uint32 skills[PACKET_SKILL_ARRAY_SIZE];
+	/*408*/ uint8 unknown408[40];
 	/*448*/
 };
 
@@ -4169,7 +4169,8 @@ struct Arrow_Struct {
 /*070*/	uint8	unknown070;
 /*071*/	uint8	item_type;
 /*072*/	uint8	skill;
-/*073*/	char	model_name[43];
+/*073*/	uint8	unknown073[16];
+/*089*/	char	model_name[27];
 /*116*/
 };
 
@@ -4396,7 +4397,7 @@ struct ItemSerializationHeader
 /*030*/ uint16 unknown013;	// 0xffff
 /*032*/	uint32 price;
 /*036*/	uint32 merchant_slot; //1 if not a merchant item
-/*040*/	uint32 unknown020; //0
+/*040*/	uint32 scaled_value; //0
 /*044*/	uint32 instance_id; //unique instance id if not merchant item, else is merchant slot
 /*048*/	uint32 unknown028; //0
 /*052*/	uint32 last_cast_time;	// Unix Time from PP of last cast for this recast type if recast delay > 0
@@ -4405,8 +4406,24 @@ struct ItemSerializationHeader
 /*064*/	uint32 unknown044;	// 0
 /*068*/	uint32 unknown048;	// 0
 /*072*/	uint32 unknown052;	// 0
-/*076*/	uint32 unknown056;	// 0
-/*080*/	uint8 unknown060;	// 0
+		uint8 isEvolving;
+};
+
+struct EvolvingItem {
+	uint8 unknown001;
+	uint8 unknown002;
+	uint8 unknown003;
+	uint8 unknown004;
+	int32 evoLevel;
+	double progress;
+	uint8 Activated;
+	int32 evomaxlevel;
+	uint8 unknown005[4];
+};
+
+struct ItemSerializationHeaderFinish
+{
+		uint16 ornamentIcon;
 /*081*/	uint8 unknown061;	// 0 - Add Evolving Item struct if this isn't set to 0?
 /*082*/	uint8 unknown062;	// 0
 /*083*/	uint32 unknowna1;	// 0xffffffff
@@ -4676,9 +4693,9 @@ struct ItemQuaternaryBodyStruct
 struct AugmentInfo_Struct
 {
 /*000*/ uint32	itemid;			// id of the solvent needed
-/*004*/ uint8	window;			// window to display the information in
-/*005*/ uint8	unknown005[71];	// total packet length 76, all the rest were always 00
-/*076*/
+/*004*/ uint32	window;			// window to display the information in
+/*008*/ char	augment_info[64];	// total packet length 76, all the rest were always 00
+/*072*/ uint32	unknown072;
 };
 
 struct VeteranRewardItem

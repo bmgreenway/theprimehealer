@@ -66,20 +66,19 @@ Copyright (C) 2001-2002 EQEMu Development Team (http://eqemu.org)
 	and not SpellFinished().
 */
 
-#include "../common/debug.h"
-#include "../common/spdat.h"
-#include "masterentity.h"
-#include "../common/packet_dump.h"
-#include "../common/moremath.h"
-#include "../common/item.h"
-#include "worldserver.h"
-#include "../common/skills.h"
 #include "../common/bodytypes.h"
 #include "../common/classes.h"
+#include "../common/debug.h"
+#include "../common/item.h"
 #include "../common/rulesys.h"
+#include "../common/skills.h"
+#include "../common/spdat.h"
 #include "../common/string_util.h"
-#include <math.h>
+#include "quest_parser_collection.h"
+#include "string_ids.h"
+#include "worldserver.h"
 #include <assert.h>
+#include <math.h>
 
 #ifndef WIN32
 	#include <stdlib.h>
@@ -90,8 +89,7 @@ Copyright (C) 2001-2002 EQEMu Development Team (http://eqemu.org)
 	#include "../common/packet_dump_file.h"
 #endif
 
-#include "string_ids.h"
-#include "quest_parser_collection.h"
+
 
 extern Zone* zone;
 extern volatile bool ZoneLoaded;
@@ -122,17 +120,7 @@ void Mob::SpellProcess()
 void NPC::SpellProcess()
 {
 	Mob::SpellProcess();
-
-	if (GetSwarmInfo()) {
-		if (GetSwarmInfo()->duration->Check(false))
-			Depop();
-
-		Mob *targMob = entity_list.GetMob(GetSwarmInfo()->target);
-		if (GetSwarmInfo()->target != 0) {
-			if(!targMob || (targMob && targMob->IsCorpse()))
-				Depop();
-		}
-	}
+	DepopSwarmPets();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -254,7 +242,7 @@ bool Mob::CastSpell(uint16 spell_id, uint16 target_id, uint16 slot,
 	}
 
 	//Added to prevent MQ2 exploitation of equipping normally-unequippable/clickable items with effects and clicking them for benefits.
-	if(item_slot && IsClient() && ((slot == USE_ITEM_SPELL_SLOT) || (slot == POTION_BELT_SPELL_SLOT)))
+	if(item_slot && IsClient() && ((slot == USE_ITEM_SPELL_SLOT) || (slot == POTION_BELT_SPELL_SLOT) || (slot == TARGET_RING_SPELL_SLOT)))
 	{
 		ItemInst *itm = CastToClient()->GetInv().GetItem(item_slot);
 		int bitmask = 1;
@@ -307,6 +295,10 @@ bool Mob::CastSpell(uint16 spell_id, uint16 target_id, uint16 slot,
 		sprintf(temp, "%d", spell_id);
 		parse->EventNPC(EVENT_CAST_BEGIN, CastToNPC(), nullptr, temp, 0);
 	}
+	
+	//To prevent NPC ghosting when spells are cast from scripts
+	if (IsNPC() && IsMoving() && cast_time > 0)
+		SendPosition();
 
 	if(resist_adjust)
 	{
@@ -364,6 +356,8 @@ bool Mob::DoCastSpell(uint16 spell_id, uint16 target_id, uint16 slot,
 	if((IsGroupSpell(spell_id) ||
 		spell.targettype == ST_Self ||
 		spell.targettype == ST_AECaster ||
+		spell.targettype == ST_Ring ||
+		spell.targettype == ST_Beam ||
 		spell.targettype == ST_TargetOptional) && target_id == 0)
 	{
 		mlog(SPELLS__CASTING, "Spell %d auto-targeted the caster. Group? %d, target type %d", spell_id, IsGroupSpell(spell_id), spell.targettype);
@@ -704,7 +698,7 @@ bool Client::CheckFizzle(uint16 spell_id)
 			break;
 		}
 		if(((specialize/6.0f) + 15.0f) < MakeRandomFloat(0, 100)) {
-			specialize *= SPECIALIZE_FIZZLE / 200;
+			specialize *= SPECIALIZE_FIZZLE / 200.0f;
 		} else {
 			specialize = 0.0f;
 		}
@@ -714,7 +708,7 @@ bool Client::CheckFizzle(uint16 spell_id)
 	// > 0 --> skill is lower, higher chance of fizzle
 	// < 0 --> skill is better, lower chance of fizzle
 	// the max that diff can be is +- 235
-	float diff = par_skill + spells[spell_id].basediff - act_skill;
+	float diff = par_skill + static_cast<float>(spells[spell_id].basediff) - act_skill;
 
 	// if you have high int/wis you fizzle less, you fizzle more if you are stupid
 	if(GetClass() == BARD)
@@ -880,7 +874,7 @@ void Mob::CastedSpellFinished(uint16 spell_id, uint32 target_id, uint16 slot,
 {
 	bool IsFromItem = false;
 
-	if(IsClient() && slot != USE_ITEM_SPELL_SLOT && slot != POTION_BELT_SPELL_SLOT && spells[spell_id].recast_time > 1000) { // 10 is item
+	if(IsClient() && slot != USE_ITEM_SPELL_SLOT && slot != POTION_BELT_SPELL_SLOT && slot != TARGET_RING_SPELL_SLOT && spells[spell_id].recast_time > 1000) { // 10 is item
 		if(!CastToClient()->GetPTimers().Expired(&database, pTimerSpellStart + spell_id, false)) {
 			//should we issue a message or send them a spell gem packet?
 			Message_StringID(13, SPELL_RECAST);
@@ -890,7 +884,7 @@ void Mob::CastedSpellFinished(uint16 spell_id, uint32 target_id, uint16 slot,
 		}
 	}
 
-	if(IsClient() && ((slot == USE_ITEM_SPELL_SLOT) || (slot == POTION_BELT_SPELL_SLOT)))
+	if(IsClient() && ((slot == USE_ITEM_SPELL_SLOT) || (slot == POTION_BELT_SPELL_SLOT) || (slot == TARGET_RING_SPELL_SLOT)))
 	{
 		IsFromItem = true;
 		ItemInst *itm = CastToClient()->GetInv().GetItem(inventory_slot);
@@ -1186,7 +1180,7 @@ void Mob::CastedSpellFinished(uint16 spell_id, uint32 target_id, uint16 slot,
 
 	int16 DeleteChargeFromSlot = -1;
 
-	if(IsClient() && ((slot == USE_ITEM_SPELL_SLOT) || (slot == POTION_BELT_SPELL_SLOT))
+	if(IsClient() && ((slot == USE_ITEM_SPELL_SLOT) || (slot == POTION_BELT_SPELL_SLOT) || (slot == TARGET_RING_SPELL_SLOT))
 		&& inventory_slot != 0xFFFFFFFF)	// 10 is an item
 	{
 		bool fromaug = false;
@@ -1605,9 +1599,48 @@ bool Mob::DetermineSpellTargets(uint16 spell_id, Mob *&spell_target, Mob *&ae_ce
 			break;
 		}
 
+		case ST_AETargetHateList:
+		{
+			if (spells[spell_id].range > 0)
+			{
+				if(!spell_target)
+					return false;
+				
+				ae_center = spell_target;
+				CastAction = AETarget;
+			}
+			else {
+				spell_target = nullptr;
+				ae_center = this;
+				CastAction = CAHateList;
+			}
+			break;
+		}
+
+		case ST_AreaClientOnly:
+		case ST_AreaNPCOnly:
+		{
+			if (spells[spell_id].range > 0)
+			{
+				if(!spell_target)
+					return false;
+				
+				ae_center = spell_target;
+				CastAction = AETarget;
+			}
+			else {
+				spell_target = nullptr;
+				ae_center = this;
+				CastAction = AECaster;
+			}
+			break;
+		}
+
 		case ST_UndeadAE:	//should only affect undead...
+		case ST_SummonedAE:
 		case ST_TargetAETap:
 		case ST_AETarget:
+		case ST_TargetAENoPlayersPets:
 		{
 			if(!spell_target)
 			{
@@ -1623,6 +1656,7 @@ bool Mob::DetermineSpellTargets(uint16 spell_id, Mob *&spell_target, Mob *&ae_ce
 		// Group spells
 		case ST_GroupTeleport:
 		case ST_Group:
+		case ST_GroupNoPets:
 		{
 			if(IsClient() && CastToClient()->TGB() && IsTGBCompatibleSpell(spell_id)) {
 				if( (!target) ||
@@ -1634,6 +1668,12 @@ bool Mob::DetermineSpellTargets(uint16 spell_id, Mob *&spell_target, Mob *&ae_ce
 			} else {
 				spell_target = this;
 			}
+
+			if (spell_target && spell_target->IsPet() && spells[spell_id].targettype == ST_GroupNoPets){
+				Message_StringID(13,NO_CAST_ON_PET);
+				return false;
+			}
+
 			CastAction = GroupSpell;
 			break;
 		}
@@ -1795,6 +1835,22 @@ bool Mob::DetermineSpellTargets(uint16 spell_id, Mob *&spell_target, Mob *&ae_ce
 
 			spell_target = owner;
 			CastAction = SingleTarget;
+			break;
+		}
+
+		case ST_Beam:
+		{
+			CastAction = Beam;
+			spell_target = nullptr;
+			ae_center = nullptr;
+			break;
+		}
+
+		case ST_Ring:
+		{
+			CastAction = TargetRing;
+			spell_target = nullptr;
+			ae_center = nullptr;
 			break;
 		}
 
@@ -2020,15 +2076,28 @@ bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, uint16 slot, uint16 
 			} else {
 				// regular PB AE or targeted AE spell - spell_target is null if PB
 				if(spell_target)	// this must be an AETarget spell
-				{
+				{	
+					bool cast_on_target = true;
+					if (spells[spell_id].targettype == ST_TargetAENoPlayersPets && spell_target->IsPetOwnerClient())
+						cast_on_target = false;
+					if (spells[spell_id].targettype == ST_AreaClientOnly && !spell_target->IsClient())
+						cast_on_target = false;
+					if (spells[spell_id].targettype == ST_AreaNPCOnly && !spell_target->IsNPC())
+						cast_on_target = false;
+
 					// affect the target too
-					SpellOnTarget(spell_id, spell_target, false, true, resist_adjust);
+					if (cast_on_target)
+						SpellOnTarget(spell_id, spell_target, false, true, resist_adjust);
 				}
 				if(ae_center && ae_center == this && IsBeneficialSpell(spell_id))
 					SpellOnTarget(spell_id, this);
 
 				bool affect_caster = !IsNPC();	//NPC AE spells do not affect the NPC caster
-				entity_list.AESpell(this, ae_center, spell_id, affect_caster, resist_adjust);
+
+				if (spells[spell_id].targettype == ST_AETargetHateList)
+					hate_list.SpellCast(this, spell_id, spells[spell_id].aoerange, ae_center);
+				else
+					entity_list.AESpell(this, ae_center, spell_id, affect_caster, resist_adjust);
 			}
 			break;
 		}
@@ -2086,7 +2155,7 @@ bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, uint16 slot, uint16 
 						SpellOnTarget(spell_id, this);
 	#ifdef GROUP_BUFF_PETS
 						//pet too
-						if (GetPet() && HasPetAffinity() && !GetPet()->IsCharmed())
+						if (spells[spell_id].targettype != ST_GroupNoPets && GetPet() && HasPetAffinity() && !GetPet()->IsCharmed())
 							SpellOnTarget(spell_id, GetPet());
 	#endif
 					}
@@ -2094,7 +2163,7 @@ bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, uint16 slot, uint16 
 					SpellOnTarget(spell_id, spell_target);
 	#ifdef GROUP_BUFF_PETS
 					//pet too
-					if (spell_target->GetPet() && HasPetAffinity() && !spell_target->GetPet()->IsCharmed())
+					if (spells[spell_id].targettype != ST_GroupNoPets && spell_target->GetPet() && HasPetAffinity() && !spell_target->GetPet()->IsCharmed())
 						SpellOnTarget(spell_id, spell_target->GetPet());
 	#endif
 				}
@@ -2113,52 +2182,19 @@ bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, uint16 slot, uint16 
 
 		case DirectionalAE:
 		{
-			float angle_start = spells[spell_id].directional_start + (GetHeading() * 360.0f / 256.0f);
-			float angle_end = spells[spell_id].directional_end + (GetHeading() * 360.0f / 256.0f);
+			ConeDirectional(spell_id, resist_adjust);
+			break;
+		}
+ 
+		case Beam:
+		{
+			BeamDirectional(spell_id, resist_adjust);
+ 			break;
+ 		}
 
-			while(angle_start > 360.0f)
-				angle_start -= 360.0f;
-
-			while(angle_end > 360.0f)
-				angle_end -= 360.0f;
-
-			std::list<Mob*> targets_in_range;
-			std::list<Mob*>::iterator iter;
-
-			entity_list.GetTargetsForConeArea(this, spells[spell_id].min_range, spells[spell_id].aoerange, spells[spell_id].aoerange / 2, targets_in_range);
-			iter = targets_in_range.begin();
-			while(iter != targets_in_range.end())
-			{
-				float heading_to_target = (CalculateHeadingToTarget((*iter)->GetX(), (*iter)->GetY()) * 360.0f / 256.0f);
-				while(heading_to_target < 0.0f)
-					heading_to_target += 360.0f;
-
-				while(heading_to_target > 360.0f)
-					heading_to_target -= 360.0f;
-
-				if(angle_start > angle_end)
-				{
-					if((heading_to_target >= angle_start && heading_to_target <= 360.0f) ||
-						(heading_to_target >= 0.0f && heading_to_target <= angle_end))
-					{
-						if(CheckLosFN((*iter)) || spells[spell_id].npc_no_los){
-							(*iter)->CalcSpellPowerDistanceMod(spell_id, 0, this);
-							SpellOnTarget(spell_id, (*iter), false, true, resist_adjust);
-						}
-					}
-				}
-				else
-				{
-					if(heading_to_target >= angle_start && heading_to_target <= angle_end)
-					{
-						if(CheckLosFN((*iter)) || spells[spell_id].npc_no_los){
-							(*iter)->CalcSpellPowerDistanceMod(spell_id, 0, this);
-							SpellOnTarget(spell_id, (*iter), false, true, resist_adjust);
-						}
-					}
-				}
-				++iter;
-			}
+		case TargetRing:
+		{
+			entity_list.AESpell(this, nullptr, spell_id, false, resist_adjust);
 			break;
 		}
 	}
@@ -2175,7 +2211,7 @@ bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, uint16 slot, uint16 
 
 	// if this was a spell slot or an ability use up the mana for it
 	// CastSpell already reduced the cost for it if we're a client with focus
-	if(slot != USE_ITEM_SPELL_SLOT && slot != POTION_BELT_SPELL_SLOT && mana_used > 0)
+	if(slot != USE_ITEM_SPELL_SLOT && slot != POTION_BELT_SPELL_SLOT && slot != TARGET_RING_SPELL_SLOT && mana_used > 0)
 	{
 		mlog(SPELLS__CASTING, "Spell %d: consuming %d mana", spell_id, mana_used);
 		if (!DoHPToManaCovert(mana_used))
@@ -2191,7 +2227,7 @@ bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, uint16 slot, uint16 
 			CastToClient()->GetPTimers().Start(casting_spell_timer, casting_spell_timer_duration);
 			mlog(SPELLS__CASTING, "Spell %d: Setting custom reuse timer %d to %d", spell_id, casting_spell_timer, casting_spell_timer_duration);
 		}
-		else if(spells[spell_id].recast_time > 1000) {
+		else if(spells[spell_id].recast_time > 1000 && !spells[spell_id].IsDisciplineBuff) {
 			int recast = spells[spell_id].recast_time/1000;
 			if (spell_id == SPELL_LAY_ON_HANDS)	//lay on hands
 			{
@@ -2210,7 +2246,7 @@ bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, uint16 slot, uint16 
 		}
 	}
 
-	if(IsClient() && ((slot == USE_ITEM_SPELL_SLOT) || (slot == POTION_BELT_SPELL_SLOT)))
+	if(IsClient() && ((slot == USE_ITEM_SPELL_SLOT) || (slot == POTION_BELT_SPELL_SLOT) || (slot == TARGET_RING_SPELL_SLOT)))
 	{
 		ItemInst *itm = CastToClient()->GetInv().GetItem(inventory_slot);
 		if(itm && itm->GetItem()->RecastDelay > 0){
@@ -2392,7 +2428,7 @@ bool Mob::ApplyNextBardPulse(uint16 spell_id, Mob *spell_target, uint16 slot) {
 
 void Mob::BardPulse(uint16 spell_id, Mob *caster) {
 	int buffs_i;
-	uint32 buff_count = GetMaxTotalSlots();
+	int buff_count = GetMaxTotalSlots();
 	for (buffs_i = 0; buffs_i < buff_count; buffs_i++) {
 		if(buffs[buffs_i].spellid != spell_id)
 			continue;
@@ -2997,7 +3033,7 @@ int Mob::AddBuff(Mob *caster, uint16 spell_id, int duration, int32 level_overrid
 	// it would overwrite, and then hitting a buff we can't stack with.
 	// we also check if overwriting will occur. this is so after this loop
 	// we can determine if there will be room for this buff
-	uint32 buff_count = GetMaxTotalSlots();
+	int buff_count = GetMaxTotalSlots();
 	uint32 start_slot = 0;
 	uint32 end_slot = 0;
 	if (IsDisciplineBuff(spell_id)) {
@@ -3122,7 +3158,7 @@ int Mob::AddBuff(Mob *caster, uint16 spell_id, int duration, int32 level_overrid
 
 		entity_list.QueueClientsByTarget(this, outapp, false, nullptr, true, false, BIT_SoDAndLater);
 
-		if(GetTarget() == this)
+		if(IsClient() && GetTarget() == this)
 			CastToClient()->QueuePacket(outapp);
 
 		safe_delete(outapp);
@@ -3151,7 +3187,7 @@ int Mob::CanBuffStack(uint16 spellid, uint8 caster_level, bool iFailIfOverwrite)
 
 	mlog(AI__BUFFS, "Checking if buff %d cast at level %d can stack on me.%s", spellid, caster_level, iFailIfOverwrite?" failing if we would overwrite something":"");
 
-	uint32 buff_count = GetMaxTotalSlots();
+	int buff_count = GetMaxTotalSlots();
 	for (i=0; i < buff_count; i++)
 	{
 		const Buffs_Struct &curbuf = buffs[i];
@@ -3219,6 +3255,11 @@ bool Mob::SpellOnTarget(uint16 spell_id, Mob* spelltar, bool reflect, bool use_r
 
 	if(spelltar->IsClient() && spelltar->CastToClient()->IsHoveringForRespawn())
 		return false;
+
+	if (spells[spell_id].sneak && IsClient() && !CastToClient()->sneaking){
+		Message_StringID(13, SNEAK_RESTRICT);
+		return false;//Fail Safe, this can cause a zone crash certain situations if you try to apply sneak effects when not sneaking.
+	}
 
 	if(IsDetrimentalSpell(spell_id) && !IsAttackAllowed(spelltar) && !IsResurrectionEffects(spell_id)) {
 		if(!IsClient() || !CastToClient()->GetGM()) {
@@ -3301,6 +3342,12 @@ bool Mob::SpellOnTarget(uint16 spell_id, Mob* spelltar, bool reflect, bool use_r
 		char temp1[100];
 		sprintf(temp1, "%d", spell_id);
 		parse->EventNPC(EVENT_CAST_ON, spelltar->CastToNPC(), this, temp1, 0);
+	}
+	else if (spelltar->IsClient())
+	{
+		char temp1[100];
+		sprintf(temp1, "%d", spell_id);
+		parse->EventPlayer(EVENT_CAST_ON, spelltar->CastToClient(),temp1, 0);
 	}
 
 	mod_spell_cast(spell_id, spelltar, reflect, use_resist_adjust, resist_adjust, isproc);
@@ -3499,7 +3546,7 @@ bool Mob::SpellOnTarget(uint16 spell_id, Mob* spelltar, bool reflect, bool use_r
 	}
 	// Block next spell effect should be used up first(since its blocking the next spell)
 	if(CanBlockSpell()) {
-		uint32 buff_count = GetMaxTotalSlots();
+		int buff_count = GetMaxTotalSlots();
 		int focus = 0;
 		for (int b=0; b < buff_count; b++) {
 			if(IsEffectInSpell(buffs[b].spellid, SE_BlockNextSpellFocus)) {
@@ -3763,9 +3810,9 @@ bool Mob::SpellOnTarget(uint16 spell_id, Mob* spelltar, bool reflect, bool use_r
 
 void Corpse::CastRezz(uint16 spellid, Mob* Caster)
 {
-	_log(SPELLS__REZ, "Corpse::CastRezz spellid %i, Rezzed() is %i, rezzexp is %i", spellid,Rezzed(),rezzexp);
+	_log(SPELLS__REZ, "Corpse::CastRezz spellid %i, Rezzed() is %i, rezzexp is %i", spellid,IsRezzed(),rez_experience);
 
-	if(Rezzed()){
+	if(IsRezzed()){
 		if(Caster && Caster->IsClient())
 			Caster->Message(13,"This character has already been resurrected.");
 
@@ -3782,7 +3829,7 @@ void Corpse::CastRezz(uint16 spellid, Mob* Caster)
 	EQApplicationPacket* outapp = new EQApplicationPacket(OP_RezzRequest, sizeof(Resurrect_Struct));
 	Resurrect_Struct* rezz = (Resurrect_Struct*) outapp->pBuffer;
 	// Why are we truncating these names to 30 characters ?
-	memcpy(rezz->your_name,this->orgname,30);
+	memcpy(rezz->your_name,this->corpse_name,30);
 	memcpy(rezz->corpse_name,this->name,30);
 	memcpy(rezz->rezzer_name,Caster->GetName(),30);
 	rezz->zone_id = zone->GetZoneID();
@@ -3795,7 +3842,7 @@ void Corpse::CastRezz(uint16 spellid, Mob* Caster)
 	rezz->unknown020 = 0x00000000;
 	rezz->unknown088 = 0x00000000;
 	// We send this to world, because it needs to go to the player who may not be in this zone.
-	worldserver.RezzPlayer(outapp, rezzexp, dbid, OP_RezzRequest);
+	worldserver.RezzPlayer(outapp, rez_experience, corpse_db_id, OP_RezzRequest);
 	_pkt(SPELLS__REZ, outapp);
 	safe_delete(outapp);
 }
@@ -3815,7 +3862,7 @@ bool Mob::FindBuff(uint16 spellid)
 // removes all buffs
 void Mob::BuffFadeAll()
 {
-	uint32 buff_count = GetMaxTotalSlots();
+	int buff_count = GetMaxTotalSlots();
 	for (int j = 0; j < buff_count; j++) {
 		if(buffs[j].spellid != SPELL_UNKNOWN)
 			BuffFadeBySlot(j, false);
@@ -3826,7 +3873,7 @@ void Mob::BuffFadeAll()
 
 void Mob::BuffFadeNonPersistDeath()
 {
-	uint32 buff_count = GetMaxTotalSlots();
+	int buff_count = GetMaxTotalSlots();
 	for (int j = 0; j < buff_count; j++) {
 		if (buffs[j].spellid != SPELL_UNKNOWN && !IsPersistDeathSpell(buffs[j].spellid))
 			BuffFadeBySlot(j, false);
@@ -3836,7 +3883,7 @@ void Mob::BuffFadeNonPersistDeath()
 }
 
 void Mob::BuffFadeDetrimental() {
-	uint32 buff_count = GetMaxTotalSlots();
+	int buff_count = GetMaxTotalSlots();
 	for (int j = 0; j < buff_count; j++) {
 		if(buffs[j].spellid != SPELL_UNKNOWN) {
 			if(IsDetrimentalSpell(buffs[j].spellid))
@@ -3850,7 +3897,7 @@ void Mob::BuffFadeDetrimentalByCaster(Mob *caster)
 	if(!caster)
 		return;
 
-	uint32 buff_count = GetMaxTotalSlots();
+	int buff_count = GetMaxTotalSlots();
 	for (int j = 0; j < buff_count; j++) {
 		if(buffs[j].spellid != SPELL_UNKNOWN) {
 			if(IsDetrimentalSpell(buffs[j].spellid))
@@ -3890,7 +3937,7 @@ void Mob::BuffFadeBySitModifier()
 // removes the buff matching spell_id
 void Mob::BuffFadeBySpellID(uint16 spell_id)
 {
-	uint32 buff_count = GetMaxTotalSlots();
+	int buff_count = GetMaxTotalSlots();
 	for (int j = 0; j < buff_count; j++)
 	{
 		if (buffs[j].spellid == spell_id)
@@ -3906,7 +3953,7 @@ void Mob::BuffFadeByEffect(int effectid, int skipslot)
 {
 	int i;
 
-	uint32 buff_count = GetMaxTotalSlots();
+	int buff_count = GetMaxTotalSlots();
 	for(i = 0; i < buff_count; i++)
 	{
 		if(buffs[i].spellid == SPELL_UNKNOWN)
@@ -4537,7 +4584,7 @@ float Mob::GetAOERange(uint16 spell_id) {
 
 		if(IsBardSong(spell_id) && IsBeneficialSpell(spell_id)) {
 			//Live AA - Extended Notes, SionachiesCrescendo
-			float song_bonus = aabonuses.SongRange + spellbonuses.SongRange + itembonuses.SongRange;
+			float song_bonus = static_cast<float>(aabonuses.SongRange + spellbonuses.SongRange + itembonuses.SongRange);
 			range += range*song_bonus /100.0f;
 		}
 
@@ -4669,7 +4716,7 @@ void NPC::Stun(int duration) {
 
 void NPC::UnStun() {
 	Mob::UnStun();
-	SetRunAnimSpeed(this->GetRunspeed());
+	SetRunAnimSpeed(static_cast<int8>(GetRunspeed()));
 	SendPosition();
 }
 
@@ -4885,7 +4932,7 @@ int Client::FindSpellBookSlotBySpellID(uint16 spellid) {
 	return -1;	//default
 }
 
-bool Client::SpellGlobalCheck(uint16 spell_ID, uint16 char_ID) {
+bool Client::SpellGlobalCheck(uint16 spell_ID, uint32 char_ID) {
 
 	std::string spell_Global_Name;
 	int spell_Global_Value;
@@ -4959,7 +5006,7 @@ uint16 Mob::GetSpellIDFromSlot(uint8 slot)
 }
 
 bool Mob::FindType(uint16 type, bool bOffensive, uint16 threshold) {
-	uint32 buff_count = GetMaxTotalSlots();
+	int buff_count = GetMaxTotalSlots();
 	for (int i = 0; i < buff_count; i++) {
 		if (buffs[i].spellid != SPELL_UNKNOWN) {
 
@@ -5291,7 +5338,7 @@ EQApplicationPacket *Mob::MakeBuffsPacket(bool for_target)
 
 void Mob::BuffModifyDurationBySpellID(uint16 spell_id, int32 newDuration)
 {
-	uint32 buff_count = GetMaxTotalSlots();
+	int buff_count = GetMaxTotalSlots();
 	for(int i = 0; i < buff_count; ++i)
 	{
 		if (buffs[i].spellid == spell_id)
@@ -5365,4 +5412,140 @@ void Client::SendSpellAnim(uint16 targetid, uint16 spell_id)
 
 	app.priority = 1;
 	entity_list.QueueCloseClients(this, &app);
+}
+
+void Mob::CalcDestFromHeading(float heading, float distance, float MaxZDiff, float StartX, float StartY, float &dX, float &dY, float &dZ)
+{
+	if (!distance) { return; }
+	if (!MaxZDiff) { MaxZDiff = 5; }
+
+	float ReverseHeading = 256 - heading;
+	float ConvertAngle = ReverseHeading * 1.40625f;
+	if (ConvertAngle <= 270)
+		ConvertAngle = ConvertAngle + 90;
+	else
+		ConvertAngle = ConvertAngle - 270;
+
+	float Radian = ConvertAngle * (3.1415927f / 180.0f);
+
+	float CircleX = distance * cos(Radian);
+	float CircleY = distance * sin(Radian);
+	dX = CircleX + StartX;
+	dY = CircleY + StartY;
+	dZ = FindGroundZ(dX, dY, MaxZDiff);
+}
+
+void Mob::BeamDirectional(uint16 spell_id, int16 resist_adjust)
+{
+	int maxtarget_count = 0;
+	bool beneficial_targets = false;
+
+	if (IsBeneficialSpell(spell_id) && IsClient())
+		beneficial_targets = true;
+	
+	std::list<Mob*> targets_in_range;
+	std::list<Mob*>::iterator iter;
+
+	entity_list.GetTargetsForConeArea(this, spells[spell_id].min_range, spells[spell_id].range, spells[spell_id].range / 2, targets_in_range);
+	iter = targets_in_range.begin();
+	
+	float dX = 0;
+	float dY = 0;
+	float dZ = 0;
+	
+	CalcDestFromHeading(GetHeading(), spells[spell_id].range, 5, GetX(), GetY(), dX, dY, dZ);
+	dZ = GetZ();
+	
+	//FIND SLOPE: Put it into the form y = mx + b
+	float m = (dY - GetY()) / (dX - GetX());
+	float b = (GetY() * dX - dY * GetX()) / (dX - GetX());
+ 
+	while(iter != targets_in_range.end())
+	{
+		if (!(*iter) || (beneficial_targets && ((*iter)->IsNPC() && !(*iter)->IsPetOwnerClient())) 
+			|| (*iter)->BehindMob(this, (*iter)->GetX(),(*iter)->GetY())){
+		    ++iter;
+			continue;
+		}
+
+		//# shortest distance from line to target point
+		float d = abs( (*iter)->GetY() - m * (*iter)->GetX() - b) / sqrt(m * m + 1);
+					
+		if (d <= spells[spell_id].aoerange)
+		{
+			if(CheckLosFN((*iter)) || spells[spell_id].npc_no_los) {
+				(*iter)->CalcSpellPowerDistanceMod(spell_id, 0, this);
+				SpellOnTarget(spell_id, (*iter), false, true, resist_adjust);
+				maxtarget_count++;
+			}
+
+			if (maxtarget_count >= spells[spell_id].aemaxtargets)
+				return;
+		}
+		++iter;
+	}
+}
+
+void Mob::ConeDirectional(uint16 spell_id, int16 resist_adjust)
+{
+	int maxtarget_count = 0;
+	bool beneficial_targets = false;
+
+	if (IsBeneficialSpell(spell_id) && IsClient())
+		beneficial_targets = true;
+
+	float angle_start = spells[spell_id].directional_start + (GetHeading() * 360.0f / 256.0f);
+	float angle_end = spells[spell_id].directional_end + (GetHeading() * 360.0f / 256.0f);
+
+	while(angle_start > 360.0f)
+		angle_start -= 360.0f;
+
+	while(angle_end > 360.0f)
+		angle_end -= 360.0f;
+
+	std::list<Mob*> targets_in_range;
+	std::list<Mob*>::iterator iter;
+
+	entity_list.GetTargetsForConeArea(this, spells[spell_id].min_range, spells[spell_id].aoerange, spells[spell_id].aoerange / 2, targets_in_range);
+	iter = targets_in_range.begin();
+
+	while(iter != targets_in_range.end()){
+
+		if (!(*iter) || (beneficial_targets && ((*iter)->IsNPC() && !(*iter)->IsPetOwnerClient()))){
+		    ++iter;
+			continue;
+		}
+
+		float heading_to_target = (CalculateHeadingToTarget((*iter)->GetX(), (*iter)->GetY()) * 360.0f / 256.0f);
+	
+		while(heading_to_target < 0.0f)
+			heading_to_target += 360.0f;
+
+		while(heading_to_target > 360.0f)
+			heading_to_target -= 360.0f;
+
+		if(angle_start > angle_end){
+			if((heading_to_target >= angle_start && heading_to_target <= 360.0f) ||	(heading_to_target >= 0.0f && heading_to_target <= angle_end)){
+				if(CheckLosFN((*iter)) || spells[spell_id].npc_no_los){
+					(*iter)->CalcSpellPowerDistanceMod(spell_id, 0, this);
+					SpellOnTarget(spell_id,(*iter), false, true, resist_adjust);
+					maxtarget_count++;
+				}
+			}
+		}
+		else{
+			if(heading_to_target >= angle_start && heading_to_target <= angle_end){
+				if(CheckLosFN((*iter)) || spells[spell_id].npc_no_los) {
+					(*iter)->CalcSpellPowerDistanceMod(spell_id, 0, this);
+					SpellOnTarget(spell_id, (*iter), false, true, resist_adjust);
+					maxtarget_count++;
+				}
+			}
+		}
+
+		if (maxtarget_count >= spells[spell_id].aemaxtargets)
+			return;
+
+		++iter;
+	}
 }

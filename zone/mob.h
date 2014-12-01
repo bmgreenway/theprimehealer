@@ -18,21 +18,28 @@
 #ifndef MOB_H
 #define MOB_H
 
-#include "../common/features.h"
 #include "common.h"
 #include "entity.h"
 #include "hate_list.h"
 #include "pathing.h"
 #include <set>
 #include <vector>
-#include <string>
 
 char* strn0cpy(char* dest, const char* source, uint32 size);
 
 #define MAX_SPECIAL_ATTACK_PARAMS 8
 
 class EGNode;
-class MobFearState;
+class Client;
+class EQApplicationPacket;
+class Group;
+class ItemInst;
+class NPC;
+class Raid;
+struct Item_Struct;
+struct NewSpawn_Struct;
+struct PlayerPositionUpdateServer_Struct;
+
 class Mob : public Entity {
 public:
 	enum CLIENT_CONN_STATUS { CLIENT_CONNECTING, CLIENT_CONNECTED, CLIENT_LINKDEAD,
@@ -235,7 +242,9 @@ public:
 	void ResourceTap(int32 damage, uint16 spell_id);
 	void TryTriggerThreshHold(int32 damage, int effect_id, Mob* attacker);
 	bool CheckSpellCategory(uint16 spell_id, int category_id, int effect_id);
-	
+	void CalcDestFromHeading(float heading, float distance, float MaxZDiff, float StartX, float StartY, float &dX, float &dY, float &dZ);
+	void BeamDirectional(uint16 spell_id, int16 resist_adjust);
+	void ConeDirectional(uint16 spell_id, int16 resist_adjust);
 
 	//Buff
 	void BuffProcess();
@@ -273,7 +282,7 @@ public:
 	int16 GetBuffSlotFromType(uint16 type);
 	uint16 GetSpellIDFromSlot(uint8 slot);
 	int CountDispellableBuffs();
-	void CheckNumHitsRemaining(uint8 type, uint32 buff_slot=0, uint16 spell_id=SPELL_UNKNOWN);
+	void CheckNumHitsRemaining(uint8 type, int32 buff_slot=-1, uint16 spell_id=SPELL_UNKNOWN);
 	bool HasNumhits() const { return has_numhits; }
 	inline void Numhits(bool val) { has_numhits = val; }
 	bool HasMGB() const { return has_MGB; }
@@ -287,6 +296,11 @@ public:
 	inline virtual uint32 GetNimbusEffect2() const { return nimbus_effect2; }
 	inline virtual uint32 GetNimbusEffect3() const { return nimbus_effect3; }
 	void RemoveNimbusEffect(int effectid);
+	inline float GetTargetRingX() const { return targetring_x; }
+	inline float GetTargetRingY() const { return targetring_y; }
+	inline float GetTargetRingZ() const { return targetring_z; }
+	inline bool HasEndurUpkeep() const { return endur_upkeep; }
+	inline void SetEndurUpkeep(bool val) { endur_upkeep = val; }
 
 	//Basic Stats/Inventory
 	virtual void SetLevel(uint8 in_level, bool command = false) { level = in_level; }
@@ -340,39 +354,39 @@ public:
 	inline Mob* GetTarget() const { return target; }
 	virtual void SetTarget(Mob* mob);
 	virtual inline float GetHPRatio() const { return max_hp == 0 ? 0 : ((float)cur_hp/max_hp*100); }
-	inline virtual int16 GetAC() const { return AC + itembonuses.AC + spellbonuses.AC; }
-	inline virtual int16 GetATK() const { return ATK + itembonuses.ATK + spellbonuses.ATK; }
-	inline virtual int16 GetATKBonus() const { return itembonuses.ATK + spellbonuses.ATK; }
-	inline virtual int16 GetSTR() const { return STR + itembonuses.STR + spellbonuses.STR; }
-	inline virtual int16 GetSTA() const { return STA + itembonuses.STA + spellbonuses.STA; }
-	inline virtual int16 GetDEX() const { return DEX + itembonuses.DEX + spellbonuses.DEX; }
-	inline virtual int16 GetAGI() const { return AGI + itembonuses.AGI + spellbonuses.AGI; }
-	inline virtual int16 GetINT() const { return INT + itembonuses.INT + spellbonuses.INT; }
-	inline virtual int16 GetWIS() const { return WIS + itembonuses.WIS + spellbonuses.WIS; }
-	inline virtual int16 GetCHA() const { return CHA + itembonuses.CHA + spellbonuses.CHA; }
-	inline virtual int16 GetMR() const { return MR + itembonuses.MR + spellbonuses.MR; }
-	inline virtual int16 GetFR() const { return FR + itembonuses.FR + spellbonuses.FR; }
-	inline virtual int16 GetDR() const { return DR + itembonuses.DR + spellbonuses.DR; }
-	inline virtual int16 GetPR() const { return PR + itembonuses.PR + spellbonuses.PR; }
-	inline virtual int16 GetCR() const { return CR + itembonuses.CR + spellbonuses.CR; }
-	inline virtual int16 GetCorrup() const { return Corrup + itembonuses.Corrup + spellbonuses.Corrup; }
-	inline virtual int16 GetPhR() const { return PhR; }
+	inline virtual int32 GetAC() const { return AC + itembonuses.AC + spellbonuses.AC; }
+	inline virtual int32 GetATK() const { return ATK + itembonuses.ATK + spellbonuses.ATK; }
+	inline virtual int32 GetATKBonus() const { return itembonuses.ATK + spellbonuses.ATK; }
+	inline virtual int32 GetSTR() const { return STR + itembonuses.STR + spellbonuses.STR; }
+	inline virtual int32 GetSTA() const { return STA + itembonuses.STA + spellbonuses.STA; }
+	inline virtual int32 GetDEX() const { return DEX + itembonuses.DEX + spellbonuses.DEX; }
+	inline virtual int32 GetAGI() const { return AGI + itembonuses.AGI + spellbonuses.AGI; }
+	inline virtual int32 GetINT() const { return INT + itembonuses.INT + spellbonuses.INT; }
+	inline virtual int32 GetWIS() const { return WIS + itembonuses.WIS + spellbonuses.WIS; }
+	inline virtual int32 GetCHA() const { return CHA + itembonuses.CHA + spellbonuses.CHA; }
+	inline virtual int32 GetMR() const { return MR + itembonuses.MR + spellbonuses.MR; }
+	inline virtual int32 GetFR() const { return FR + itembonuses.FR + spellbonuses.FR; }
+	inline virtual int32 GetDR() const { return DR + itembonuses.DR + spellbonuses.DR; }
+	inline virtual int32 GetPR() const { return PR + itembonuses.PR + spellbonuses.PR; }
+	inline virtual int32 GetCR() const { return CR + itembonuses.CR + spellbonuses.CR; }
+	inline virtual int32 GetCorrup() const { return Corrup + itembonuses.Corrup + spellbonuses.Corrup; }
+	inline virtual int32 GetPhR() const { return PhR; }
 	inline StatBonuses GetItemBonuses() const { return itembonuses; }
 	inline StatBonuses GetSpellBonuses() const { return spellbonuses; }
 	inline StatBonuses GetAABonuses() const { return aabonuses; }
-	inline virtual int16 GetMaxSTR() const { return GetSTR(); }
-	inline virtual int16 GetMaxSTA() const { return GetSTA(); }
-	inline virtual int16 GetMaxDEX() const { return GetDEX(); }
-	inline virtual int16 GetMaxAGI() const { return GetAGI(); }
-	inline virtual int16 GetMaxINT() const { return GetINT(); }
-	inline virtual int16 GetMaxWIS() const { return GetWIS(); }
-	inline virtual int16 GetMaxCHA() const { return GetCHA(); }
-	inline virtual int16 GetMaxMR() const { return 255; }
-	inline virtual int16 GetMaxPR() const { return 255; }
-	inline virtual int16 GetMaxDR() const { return 255; }
-	inline virtual int16 GetMaxCR() const { return 255; }
-	inline virtual int16 GetMaxFR() const { return 255; }
-	inline virtual int16 GetDelayDeath() const { return 0; }
+	inline virtual int32 GetMaxSTR() const { return GetSTR(); }
+	inline virtual int32 GetMaxSTA() const { return GetSTA(); }
+	inline virtual int32 GetMaxDEX() const { return GetDEX(); }
+	inline virtual int32 GetMaxAGI() const { return GetAGI(); }
+	inline virtual int32 GetMaxINT() const { return GetINT(); }
+	inline virtual int32 GetMaxWIS() const { return GetWIS(); }
+	inline virtual int32 GetMaxCHA() const { return GetCHA(); }
+	inline virtual int32 GetMaxMR() const { return 255; }
+	inline virtual int32 GetMaxPR() const { return 255; }
+	inline virtual int32 GetMaxDR() const { return 255; }
+	inline virtual int32 GetMaxCR() const { return 255; }
+	inline virtual int32 GetMaxFR() const { return 255; }
+	inline virtual int32 GetDelayDeath() const { return 0; }
 	inline int32 GetHP() const { return cur_hp; }
 	inline int32 GetMaxHP() const { return max_hp; }
 	virtual int32 CalcMaxHP();
@@ -568,8 +582,8 @@ public:
 	virtual void UnStun();
 	inline void Silence(bool newval) { silenced = newval; }
 	inline void Amnesia(bool newval) { amnesiad = newval; }
-	void TemporaryPets(uint16 spell_id, Mob *target, const char *name_override = nullptr, uint32 duration_override = 0);
-	void TypesTemporaryPets(uint32 typesid, Mob *target, const char *name_override = nullptr, uint32 duration_override = 0, bool followme = false);
+	void TemporaryPets(uint16 spell_id, Mob *target, const char *name_override = nullptr, uint32 duration_override = 0, bool followme=true, bool sticktarg=false);
+	void TypesTemporaryPets(uint32 typesid, Mob *target, const char *name_override = nullptr, uint32 duration_override = 0, bool followme=true, bool sticktarg=false);
 	void WakeTheDead(uint16 spell_id, Mob *target, uint32 duration);
 	void Spin();
 	void Kill();
@@ -666,9 +680,15 @@ public:
 	inline virtual bool HasOwner() { if(GetOwnerID()==0){return false;} return( entity_list.GetMob(GetOwnerID()) != 0); }
 	inline virtual bool IsPet() { return(HasOwner() && !IsMerc()); }
 	inline bool HasPet() const { if(GetPetID()==0){return false;} return (entity_list.GetMob(GetPetID()) != 0);}
-	bool HadTempPets() const { return(hasTempPet); }
-	void TempPets(bool i) { hasTempPet = i; }
+	inline bool HasTempPetsActive() const { return(hasTempPet); }
+	inline void SetTempPetsActive(bool i) { hasTempPet = i; }
+	inline int16 GetTempPetCount() const { return count_TempPet; }
+	inline void SetTempPetCount(int16 i) { count_TempPet = i; }
 	bool HasPetAffinity() { if (aabonuses.GivePetGroupTarget || itembonuses.GivePetGroupTarget || spellbonuses.GivePetGroupTarget) return true; return false; }
+	inline bool IsPetOwnerClient() const { return pet_owner_client; } 
+	inline void SetPetOwnerClient(bool value) { pet_owner_client = value; }
+	inline bool IsTempPet() const { return _IsTempPet; } 
+	inline void SetTempPet(bool value) { _IsTempPet = value; }
 
 	inline const bodyType GetBodyType() const { return bodytype; }
 	inline const bodyType GetOrigBodyType() const { return orig_bodytype; }
@@ -697,7 +717,7 @@ public:
 	bool CanThisClassBlock(void) const;
 
 	int GetMonkHandToHandDelay(void);
-	uint16 GetClassLevelFactor();
+	uint32 GetClassLevelFactor();
 	void Mesmerize();
 	inline bool IsMezzed() const { return mezzed; }
 	inline bool IsStunned() const { return stunned; }
@@ -801,8 +821,8 @@ public:
 	void SetGrouped(bool v);
 	inline bool IsRaidGrouped() const { return israidgrouped; }
 	void SetRaidGrouped(bool v);
-	inline bool IsLooting() const { return islooting; }
-	void SetLooting(bool val) { islooting = val; }
+	inline uint16 IsLooting() const { return entity_id_being_looted; }
+	void SetLooting(uint16 val) { entity_id_being_looted = val; }
 
 	bool CheckWillAggro(Mob *mob);
 
@@ -818,7 +838,7 @@ public:
 	virtual int32 CheckHealAggroAmount(uint16 spell_id, uint32 heal_possible = 0);
 	virtual uint32 GetAA(uint32 aa_id) const { return(0); }
 
-	uint16 GetInstrumentMod(uint16 spell_id) const;
+	uint32 GetInstrumentMod(uint16 spell_id) const;
 	int CalcSpellEffectValue(uint16 spell_id, int effect_id, int caster_level = 1, Mob *caster = nullptr, int ticsremaining = 0);
 	int CalcSpellEffectValue_formula(int formula, int base, int max, int caster_level, uint16 spell_id, int ticsremaining = 0);
 	virtual int CheckStackConflict(uint16 spellid1, int caster_level1, uint16 spellid2, int caster_level2, Mob* caster1 = nullptr, Mob* caster2 = nullptr, int buffslot = -1);
@@ -927,26 +947,26 @@ protected:
 	bool isgrouped;
 	bool israidgrouped;
 	bool pendinggroup;
-	bool islooting;
+	uint16 entity_id_being_looted; //the id of the entity being looted, 0 if not looting.
 	uint8 texture;
 	uint8 helmtexture;
 
 	int AC;
-	int16 ATK;
-	int16 STR;
-	int16 STA;
-	int16 DEX;
-	int16 AGI;
-	int16 INT;
-	int16 WIS;
-	int16 CHA;
-	int16 MR;
-	int16 CR;
-	int16 FR;
-	int16 DR;
-	int16 PR;
-	int16 Corrup;
-	int16 PhR;
+	int32 ATK;
+	int32 STR;
+	int32 STA;
+	int32 DEX;
+	int32 AGI;
+	int32 INT;
+	int32 WIS;
+	int32 CHA;
+	int32 MR;
+	int32 CR;
+	int32 FR;
+	int32 DR;
+	int32 PR;
+	int32 Corrup;
+	int32 PhR;
 	bool moving;
 	int targeted;
 	bool findable;
@@ -1054,7 +1074,7 @@ protected:
 	Timer ranged_timer;
 	float attack_speed; //% increase/decrease in attack speed (not haste)
 	int8 attack_delay; //delay between attacks in 10ths of seconds
-	float slow_mitigation; // Allows for a slow mitigation (100 = 100%, 50% = 50%)
+	int16 slow_mitigation; // Allows for a slow mitigation (100 = 100%, 50% = 50%)
 	Timer tic_timer;
 	Timer mana_timer;
 
@@ -1127,6 +1147,7 @@ protected:
 	int16 SpellPowerDistanceMod;
 	bool last_los_check;
 	bool pseudo_rooted;
+	bool endur_upkeep;
 
 	// Bind wound
 	Timer bindwound_timer;
@@ -1219,6 +1240,9 @@ protected:
 
 	//temppet
 	bool hasTempPet;
+	bool _IsTempPet;
+	int16 count_TempPet;
+	bool pet_owner_client; //Flags regular and pets as belonging to a client
 
 	EGNode *_egnode; //the EG node we are in
 	float tarx;
@@ -1230,6 +1254,10 @@ protected:
 	float tar_vy;
 	float tar_vz;
 	float test_vector;
+
+	float targetring_x;
+	float targetring_y;
+	float targetring_z;
 
 	uint32 m_spellHitsLeft[38]; // Used to track which spells will have their numhits incremented when spell finishes casting, 38 Buffslots
 	int flymode;

@@ -16,66 +16,28 @@
 	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-/*
-
-Assuming you want to add a new perl quest function named joe
-that takes 1 integer argument....
-
-1. Add the prototype to the quest manager:
-questmgr.h: add (~line 50)
-	void joe(int arg);
-
-2. Define the actual function in questmgr.cpp:
-void QuestManager::joe(int arg) {
-	//... do something
-}
-
-3. Copy one of the XS routines in perlparser.cpp, preferably
- one with the same number of arguments as your routine. Rename
- as needed.
- Finally, add your routine to the list at the bottom of perlparser.cpp
-
-
-4.
-If you want it to work in old mode perl and .qst, edit parser.cpp
-Parser::ExCommands (~line 777)
-	else if (!strcmp(command,"joe")) {
-		quest_manager.joe(atoi(arglist[0]));
-	}
-
-And then at then end of embparser.cpp, add:
-"sub joe{push(@cmd_queue,{func=>'joe',args=>join(',',@_)});}"
-
-
-
-*/
-
-#include "../common/debug.h"
-#include "entity.h"
-#include "masterentity.h"
-#include <limits.h>
-
-#include <sstream>
-#include <iostream>
-#include <list>
-
-#include "worldserver.h"
-#include "net.h"
-#include "../common/skills.h"
 #include "../common/classes.h"
-#include "../common/races.h"
-#include "zonedb.h"
+#include "../common/debug.h"
+#include "../common/rulesys.h"
+#include "../common/skills.h"
 #include "../common/spdat.h"
-#include "../common/packet_functions.h"
 #include "../common/string_util.h"
-#include "spawn2.h"
-#include "zone.h"
+#include "entity.h"
 #include "event_codes.h"
 #include "guild_mgr.h"
-#include "../common/rulesys.h"
+#include "net.h"
 #include "qglobals.h"
-#include "quest_parser_collection.h"
 #include "queryserv.h"
+#include "questmgr.h"
+#include "quest_parser_collection.h"
+#include "spawn2.h"
+#include "worldserver.h"
+#include "zone.h"
+#include "zonedb.h"
+#include <iostream>
+#include <limits.h>
+#include <list>
+
 #ifdef BOTS
 #include "bot.h"
 #endif
@@ -85,9 +47,6 @@ extern Zone* zone;
 extern WorldServer worldserver;
 extern EntityList entity_list;
 
-#include "questmgr.h"
-
-//declare our global instance
 QuestManager quest_manager;
 
 #define QuestManagerCurrentQuestVars() \
@@ -95,6 +54,7 @@ QuestManager quest_manager;
 	Client *initiator = nullptr; \
 	ItemInst* questitem = nullptr; \
 	bool depop_npc = false; \
+	std::string encounter; \
 	do { \
 		if(!quests_running_.empty()) { \
 			running_quest e = quests_running_.top(); \
@@ -102,6 +62,7 @@ QuestManager quest_manager;
 			initiator = e.initiator; \
 			questitem = e.questitem; \
 			depop_npc = e.depop_npc; \
+			encounter = e.encounter; \
 		} \
 	} while(0)
 
@@ -151,12 +112,13 @@ void QuestManager::Process() {
 	}
 }
 
-void QuestManager::StartQuest(Mob *_owner, Client *_initiator, ItemInst* _questitem) {
+void QuestManager::StartQuest(Mob *_owner, Client *_initiator, ItemInst* _questitem, std::string encounter) {
 	running_quest run;
 	run.owner = _owner;
 	run.initiator = _initiator;
 	run.questitem = _questitem;
 	run.depop_npc = false;
+	run.encounter = encounter;
 	quests_running_.push(run);
 }
 
@@ -904,7 +866,7 @@ uint16 QuestManager::scribespells(uint8 max_level, uint8 min_level) {
 	uint16 book_slot, count;
 	uint16 curspell;
 
-	uint16 Char_ID = initiator->CharacterID();
+	uint32 Char_ID = initiator->CharacterID();
 	bool SpellGlobalRule = RuleB(Spells, EnableSpellGlobals);
 	bool SpellGlobalCheckResult = 0;
 
@@ -1290,9 +1252,9 @@ void QuestManager::signal(int npc_id, int wait_ms) {
 
 void QuestManager::setglobal(const char *varname, const char *newvalue, int options, const char *duration) {
 	QuestManagerCurrentQuestVars();
-	int qgZoneid=zone->GetZoneID();
-	int qgCharid=0;
-	int qgNpcid = owner->GetNPCTypeID();
+	int qgZoneid = zone->GetZoneID();
+	int qgCharid = 0;
+	int qgNpcid = owner ? owner->GetNPCTypeID() : 0; // encounter scripts don't have an owner
 
 	/*	options value determines the availability of global variables to NPCs when a quest begins
 		------------------------------------------------------------------
@@ -1410,9 +1372,9 @@ void QuestManager::targlobal(const char *varname, const char *value, const char 
 
 void QuestManager::delglobal(const char *varname) {
 	QuestManagerCurrentQuestVars();
-	int qgZoneid=zone->GetZoneID();
-	int qgCharid=0;
-	int qgNpcid=owner->GetNPCTypeID();
+	int qgZoneid = zone->GetZoneID();
+	int qgCharid = 0;
+	int qgNpcid = owner ? owner->GetNPCTypeID() : 0; // encounter scripts don't have an owner
 
 	if (initiator && initiator->IsClient()) // some events like waypoint and spawn don't have a player involved
 		qgCharid=initiator->CharacterID();
@@ -1741,7 +1703,7 @@ bool QuestManager::summonburriedplayercorpse(uint32 char_id, float dest_x, float
 	bool Result = false;
 
 	if(char_id > 0) {
-		Corpse* PlayerCorpse = database.SummonBurriedPlayerCorpse(char_id, zone->GetZoneID(), zone->GetInstanceID(), dest_x, dest_y, dest_z, dest_heading);
+		Corpse* PlayerCorpse = database.SummonBuriedCharacterCorpses(char_id, zone->GetZoneID(), zone->GetInstanceID(), dest_x, dest_y, dest_z, dest_heading);
 		if(PlayerCorpse) {
 			Result = true;
 		}
@@ -1764,7 +1726,7 @@ uint32 QuestManager::getplayerburriedcorpsecount(uint32 char_id) {
 	uint32 Result = 0;
 
 	if(char_id > 0) {
-		Result = database.GetPlayerBurriedCorpseCount(char_id);
+		Result = database.GetCharacterBuriedCorpseCount(char_id);
 	}
 	return Result;
 }
@@ -1778,12 +1740,12 @@ bool QuestManager::buryplayercorpse(uint32 char_id)
 		uint32 PlayerCorpse = database.GetFirstCorpseID(char_id);
 		if(PlayerCorpse > 0)
 		{
-			database.BuryPlayerCorpse(PlayerCorpse);
+			database.BuryCharacterCorpse(PlayerCorpse);
 			Corpse* corpse = entity_list.GetCorpseByDBID(PlayerCorpse);
 			if(corpse)
 			{
 				corpse->Save();
-				corpse->DepopCorpse();
+				corpse->DepopPlayerCorpse();
 			}
 			else
 			{
@@ -2545,7 +2507,7 @@ void QuestManager::DestroyInstance(uint16 instance_id)
 uint16 QuestManager::GetInstanceID(const char *zone, int16 version)
 {
 	QuestManagerCurrentQuestVars();
-	if(initiator)
+	if (initiator)
 	{
 		return database.GetInstanceID(zone, initiator->CharacterID(), version);
 	}
@@ -2555,7 +2517,7 @@ uint16 QuestManager::GetInstanceID(const char *zone, int16 version)
 void QuestManager::AssignToInstance(uint16 instance_id)
 {
 	QuestManagerCurrentQuestVars();
-	if(initiator)
+	if (initiator)
 	{
 		database.AddClientToInstance(instance_id, initiator->CharacterID());
 	}
@@ -2564,10 +2526,10 @@ void QuestManager::AssignToInstance(uint16 instance_id)
 void QuestManager::AssignGroupToInstance(uint16 instance_id)
 {
 	QuestManagerCurrentQuestVars();
-	if(initiator)
+	if (initiator)
 	{
 		Group *g = initiator->GetGroup();
-		if(g)
+		if (g)
 		{
 			uint32 gid = g->GetID();
 			database.AssignGroupToInstance(gid, instance_id);
@@ -2578,7 +2540,7 @@ void QuestManager::AssignGroupToInstance(uint16 instance_id)
 void QuestManager::AssignRaidToInstance(uint16 instance_id)
 {
 	QuestManagerCurrentQuestVars();
-	if(initiator)
+	if (initiator)
 	{
 		Raid *r = initiator->GetRaid();
 		if(r)
@@ -2592,36 +2554,28 @@ void QuestManager::AssignRaidToInstance(uint16 instance_id)
 void QuestManager::RemoveFromInstance(uint16 instance_id)
 {
 	QuestManagerCurrentQuestVars();
-	if(initiator) {
-		if(database.RemoveClientFromInstance(instance_id, initiator->CharacterID())) {
+	if (initiator)
+	{
+		if (database.RemoveClientFromInstance(instance_id, initiator->CharacterID()))
 			initiator->Message(MT_Say, "Removed client from instance.");
-		} else {
+		else
 			initiator->Message(MT_Say, "Failed to remove client from instance.");
-		}
 	}
 }
 
 void QuestManager::RemoveAllFromInstance(uint16 instance_id)
 {
 	QuestManagerCurrentQuestVars();
-	if(initiator) {
+	if (initiator)
+	{
 		std::list<uint32> charid_list;
-		bool removed_all = true;
-		uint16 fail_count = 0;
-		database.GetCharactersInInstance(instance_id,charid_list);
-		auto iter = charid_list.begin();
-		while(iter != charid_list.end()) {
-			if(!database.RemoveClientFromInstance(instance_id, *iter)) {
-				removed_all = false;
-				++fail_count;
-			}
-			++iter;
-		}
-		if (removed_all) {
+
+		if (database.RemoveClientsFromInstance(instance_id))
 			initiator->Message(MT_Say, "Removed all players from instance.");
-		} else {
-			// once the expedition system is in, this message it not relevant
-			initiator->Message(MT_Say, "Failed to remove %i player(s) from instance.", fail_count);
+		else
+		{
+			database.GetCharactersInInstance(instance_id, charid_list);
+			initiator->Message(MT_Say, "Failed to remove %i player(s) from instance.", charid_list.size()); // once the expedition system is in, this message it not relevant
 		}
 	}
 }
@@ -3013,4 +2967,13 @@ ItemInst *QuestManager::GetQuestItem() const {
 	}
 
 	return nullptr;
+}
+
+std::string QuestManager::GetEncounter() const {
+	if(!quests_running_.empty()) {
+		running_quest e = quests_running_.top();
+		return e.encounter;
+	}
+
+	return "";
 }

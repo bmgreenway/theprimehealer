@@ -94,6 +94,10 @@ void Raid::AddMember(Client *c, uint32 group, bool rleader, bool groupleader, bo
                                     c->GetName(), groupleader, rleader, looter);
     auto results = database.QueryDatabase(query);
 
+	if(!results.Success()) {
+		LogFile->write(EQEMuLog::Error, "Error inserting into raid members: %s", results.ErrorMessage().c_str());
+	}
+
 	LearnMembers();
 	VerifyRaid();
 	if (rleader) {
@@ -225,12 +229,12 @@ void Raid::SetRaidLeader(const char *wasLead, const char *name)
 	std::string query = StringFormat("UPDATE raid_members SET israidleader = 0 WHERE name = '%s'", wasLead);
 	auto results = database.QueryDatabase(query);
 	if (!results.Success())
-		printf("Set Raid Leader error: %s\n", results.ErrorMessage().c_str());
+		LogFile->write(EQEMuLog::Error, "Set Raid Leader error: %s\n", results.ErrorMessage().c_str());
 
 	query = StringFormat("UPDATE raid_members SET israidleader = 1 WHERE name = '%s'", name);
 	results = database.QueryDatabase(query);
 	if (!results.Success())
-		printf("Set Raid Leader error: %s\n", results.ErrorMessage().c_str());
+		LogFile->write(EQEMuLog::Error, "Set Raid Leader error: %s\n", results.ErrorMessage().c_str());
 
 	strn0cpy(leadername, name, 64);
 
@@ -474,7 +478,7 @@ void Raid::CastGroupSpell(Mob* caster, uint16 spellid, uint32 gid)
 		if(members[x].member == caster) {
 			caster->SpellOnTarget(spellid, caster);
 #ifdef GROUP_BUFF_PETS
-			if(caster->GetPet() && caster->HasPetAffinity() && !caster->GetPet()->IsCharmed())
+			if(spells[spellid].targettype != ST_GroupNoPets && caster->GetPet() && caster->HasPetAffinity() && !caster->GetPet()->IsCharmed())
 				caster->SpellOnTarget(spellid, caster->GetPet());
 #endif
 		}
@@ -485,7 +489,7 @@ void Raid::CastGroupSpell(Mob* caster, uint16 spellid, uint32 gid)
 				if(distance <= range2){
 					caster->SpellOnTarget(spellid, members[x].member);
 #ifdef GROUP_BUFF_PETS
-					if(members[x].member->GetPet() && members[x].member->HasPetAffinity() && !members[x].member->GetPet()->IsCharmed())
+					if(spells[spellid].targettype != ST_GroupNoPets && members[x].member->GetPet() && members[x].member->HasPetAffinity() && !members[x].member->GetPet()->IsCharmed())
 						caster->SpellOnTarget(spellid, members[x].member->GetPet());
 #endif
 				}
@@ -511,7 +515,7 @@ uint32 Raid::GetTotalRaidDamage(Mob* other)
 	return total;
 }
 
-void Raid::HealGroup(uint32 heal_amt, Mob* caster, uint32 gid, int32 range)
+void Raid::HealGroup(uint32 heal_amt, Mob* caster, uint32 gid, float range)
 {
 	if (!caster)
 		return;
@@ -554,7 +558,7 @@ void Raid::HealGroup(uint32 heal_amt, Mob* caster, uint32 gid, int32 range)
 }
 
 
-void Raid::BalanceHP(int32 penalty, uint32 gid, int32 range, Mob* caster, int32 limit)
+void Raid::BalanceHP(int32 penalty, uint32 gid, float range, Mob* caster, int32 limit)
 {
 	if (!caster)
 		return;
@@ -610,7 +614,7 @@ void Raid::BalanceHP(int32 penalty, uint32 gid, int32 range, Mob* caster, int32 
 	}
 }
 
-void Raid::BalanceMana(int32 penalty, uint32 gid, int32 range, Mob* caster, int32 limit)
+void Raid::BalanceMana(int32 penalty, uint32 gid, float range, Mob* caster, int32 limit)
 {
 	if (!caster)
 		return;

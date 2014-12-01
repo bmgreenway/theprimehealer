@@ -14,19 +14,18 @@
 	You should have received a copy of the GNU General Public License
 	along with this program; if not, write to the Free Software
 	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-*/
+	*/
+
+
 
 #include "../common/debug.h"
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <math.h>
-
-#include "masterentity.h"
-#include "string_ids.h"
 #include "../common/misc_functions.h"
 #include "../common/rulesys.h"
 #include "../common/string_util.h"
+#include "masterentity.h"
+#include "string_ids.h"
+#include <stdio.h>
+#include <string.h>
 
 
 int Mob::GetKickDamage() {
@@ -766,7 +765,7 @@ void Client::RangedAttack(Mob* other, bool CanDoubleAttack) {
 		}
 	}
 
-	float range = RangeItem->Range + AmmoItem->Range + 5; //Fudge it a little, client will let you hit something at 0 0 0 when you are at 205 0 0
+	float range = RangeItem->Range + AmmoItem->Range + 5.0f; //Fudge it a little, client will let you hit something at 0 0 0 when you are at 205 0 0
 	mlog(COMBAT__RANGED, "Calculated bow range to be %.1f", range);
 	range *= range;
 	if(DistNoRootNoZ(*GetTarget()) > range) {
@@ -876,8 +875,8 @@ void Mob::DoArcheryAttackDmg(Mob* other, const ItemInst* RangeWeapon, const Item
 
 					if(dobonus)
 					{
-						MaxDmg *= (float)2;
-						hate *= (float)2;
+						MaxDmg *= 2;
+						hate *= 2;
 						MaxDmg = mod_archery_bonus_damage(MaxDmg, RangeWeapon);
 
 						mlog(COMBAT__RANGED, "Ranger. Double damage success roll, doubling damage to %d", MaxDmg);
@@ -1802,7 +1801,7 @@ void Mob::Taunt(NPC* who, bool always_succeed, float chance_bonus) {
 
 	Mob *hate_top = who->GetHateMost();
 
-	float level_difference = GetLevel() - who->GetLevel();
+	int level_difference = GetLevel() - who->GetLevel();
 	bool Success = false;
 
 	//Support for how taunt worked pre 2000 on LIVE - Can not taunt NPC over your level.
@@ -1823,13 +1822,13 @@ void Mob::Taunt(NPC* who, bool always_succeed, float chance_bonus) {
 		else {
 
 			if (level_difference < 0){
-				tauntchance += level_difference*3;
+				tauntchance += static_cast<float>(level_difference)*3.0f;
 				if (tauntchance < 20)
 					tauntchance = 20.0f;
 			}
 
 			else {
-				tauntchance += level_difference*5;
+				tauntchance += static_cast<float>(level_difference)*5.0f;
 				if (tauntchance > 65)
 					tauntchance = 65.0f;
 			}
@@ -2127,8 +2126,6 @@ void Mob::DoMeleeSkillAttackDmg(Mob* other, uint16 weapon_damage, SkillUseTypes 
 
 	if (HasDied())
 		return;
-
-	CheckNumHitsRemaining(NUMHIT_OutgoingHitSuccess);
 
 	if(aabonuses.SpecialAttackKBProc[0] && aabonuses.SpecialAttackKBProc[1] == skillinuse){
 		int kb_chance = 25;

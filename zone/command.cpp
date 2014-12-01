@@ -42,27 +42,22 @@
 #endif
 
 #include "../common/debug.h"
-#include "../common/ptimer.h"
-#include "../common/packet_functions.h"
-#include "../common/packet_dump.h"
-#include "../common/serverinfo.h"
-#include "../common/opcodemgr.h"
 #include "../common/eq_packet.h"
-#include "../common/guilds.h"
-#include "../common/rulesys.h"
-#include "../common/string_util.h"
-//#include "../common/servertalk.h" // for oocmute and revoke
-#include "worldserver.h"
-#include "masterentity.h"
-#include "map.h"
-#include "water_map.h"
 #include "../common/features.h"
-#include "pathing.h"
+#include "../common/guilds.h"
+#include "../common/patches/patches.h"
+#include "../common/ptimer.h"
+#include "../common/rulesys.h"
+#include "../common/serverinfo.h"
+#include "../common/string_util.h"
 #include "client_logs.h"
 #include "guild_mgr.h"
-#include "titles.h"
-#include "../common/patches/patches.h"
+#include "map.h"
+#include "pathing.h"
 #include "queryserv.h"
+#include "titles.h"
+#include "water_map.h"
+#include "worldserver.h"
 
 extern QueryServ* QServ;
 extern WorldServer worldserver;
@@ -150,31 +145,19 @@ int command_init(void) {
 	if
 	(
 		command_add("resetaa","- Resets a Player's AA in their profile and refunds spent AA's to unspent, disconnects player.",200,command_resetaa) ||
-		command_add("qtest","- QueryServ testing command.",255,command_qtest) ||
 		command_add("bind","- Sets your targets bind spot to their current location",200,command_bind) ||
-		command_add("sendop","[opcode] - LE's Private test command, leave it alone",200,command_sendop) ||
-		command_add("optest","- solar's private test command",255,command_optest) ||
 		command_add("setstat","- Sets the stats to a specific value.",255,command_setstat) ||
 		command_add("incstat","- Increases or Decreases a client's stats permanently.",200,command_incstat) ||
 		command_add("help","[search term] - List available commands and their description, specify partial command as argument to search",0,command_help) ||
 		command_add("version","- Display current version of EQEmu server",0,command_version) ||
 		command_add("setfaction","[faction number] - Sets targeted NPC's faction in the database",170,command_setfaction) ||
-		command_add("serversidename","- Prints target's server side name",0,command_serversidename) ||
-		command_add("testspawn","[memloc] [value] - spawns a NPC for you only, with the specified values set in the spawn struct",200,command_testspawn) ||
-		command_add("testspawnkill","- Sends an OP_Death packet for spawn made with #testspawn",200,command_testspawnkill) ||
 		command_add("wc","[wear slot] [material] - Sends an OP_WearChange for your target",200,command_wc) ||
-		command_add("numauths","- TODO: describe this command",200,command_numauths) ||
 		command_add("setanim","[animnum] - Set target's appearance to animnum",200,command_setanim) ||
 		command_add("connectworldserver","- Make zone attempt to connect to worldserver",200,command_connectworldserver) ||
 		command_add("connectworld",nullptr,0,command_connectworldserver) ||
 		command_add("serverinfo","- Get OS info about server host",200,command_serverinfo) ||
-		command_add("crashtest","- Crash the zoneserver",200,command_crashtest) ||
 		command_add("getvariable","[varname] - Get the value of a variable from the database",200,command_getvariable) ||
 		command_add("chat","[channel num] [message] - Send a channel message to all zones",200,command_chat) ||
-		command_add("showpetspell","[spellid/searchstring] - search pet summoning spells",200,command_showpetspell) ||
-	#ifdef IPC
-		command_add("ipc","- Toggle an NPC's interactive flag",200,command_ipc) ||
-	#endif
 		command_add("npcloot","[show/money/add/remove] [itemid/all/money: pp gp sp cp] - Manipulate the loot an NPC is carrying",80,command_npcloot) ||
 		command_add("log","- Search character event log",80,command_log) ||
 		command_add("gm","- Turn player target's or your GM flag on or off",80,command_gm) ||
@@ -182,7 +165,6 @@ int command_init(void) {
 		command_add("zone","[zonename] [x] [y] [z] - Go to specified zone (coords optional)",50,command_zone) ||
 		command_add("zoneinstance","[instanceid] [x] [y] [z] - Go to specified instance zone (coords optional)",50,command_zone_instance) ||
 		command_add("peqzone","[zonename] - Go to specified zone, if you have > 75% health",0,command_peqzone) ||
-		command_add("tgczone",nullptr,0,command_peqzone) ||
 		command_add("showbuffs","- List buffs active on your target or you if no target",50,command_showbuffs) ||
 		command_add("movechar","[charname] [zonename] - Move charname to zonename",50,command_movechar) ||
 		command_add("viewpetition","[petition number] - View a petition",20,command_viewpetition) ||
@@ -192,14 +174,12 @@ int command_init(void) {
 		command_add("date","[yyyy] [mm] [dd] [HH] [MM] - Set EQ time",90,command_date) ||
 		command_add("time","[HH] [MM] - Set EQ time",90,command_time) ||
 		command_add("timezone","[HH] [MM] - Set timezone. Minutes are optional",90,command_timezone) ||
-		command_add("synctod","- Send a time of day update to every client in zone",90,command_synctod) ||
 		command_add("invulnerable","[on/off] - Turn player target's or your invulnerable flag on or off",80,command_invul) ||
 		command_add("invul",nullptr,0,command_invul) ||
 		command_add("hideme","[on/off] - Hide yourself from spawn lists.",80,command_hideme) ||
 		command_add("gmhideme",nullptr,0,command_hideme) ||
 		command_add("emote","['name'/'world'/'zone'] [type] [message] - Send an emote message",80,command_emote) ||
 		command_add("fov","- Check wether you're behind or in your target's field of view",80,command_fov) ||
-		command_add("manastat","- Report your or your target's cur/max mana",80,command_manastat) ||
 		command_add("npcstats","- Show stats about target NPC",80,command_npcstats) ||
 		command_add("zclip","[min] [max] - modifies and resends zhdr packet",80,command_zclip) ||
 		command_add("npccast","[targetname/entityid] [spellid] - Causes NPC target to cast spellid on targetname/entityid",80,command_npccast) ||
@@ -210,7 +190,6 @@ int command_init(void) {
 		command_add("permagender","[gendernum] - Change your or your player target's gender (zone to take effect)",80,command_permagender) ||
 		command_add("weather","[0/1/2/3] (Off/Rain/Snow/Manual) - Change the weather",80,command_weather) ||
 		command_add("zheader","[zonename] - Load zheader for zonename from the database",80,command_zheader) ||
-		command_add("zhdr",nullptr,0,command_zheader) ||
 		command_add("zsky","[skytype] - Change zone sky type",80,command_zsky) ||
 		command_add("zcolor","[red] [green] [blue] - Change sky color",80,command_zcolor) ||
 		command_add("zuwcoords","[z coord] - Set underworld coord",80,command_zuwcoords) ||
@@ -218,7 +197,6 @@ int command_init(void) {
 		command_add("zunderworld","[zcoord] - Sets the underworld using zcoord",80,command_zunderworld) ||
 		command_add("spon","- Sends OP_MemorizeSpell",80,command_spon) ||
 		command_add("spoff","- Sends OP_ManaChange",80,command_spoff) ||
-		command_add("itemtest","- merth's test function",250,command_itemtest) ||
 		command_add("gassign","[id] - Assign targetted NPC to predefined wandering grid id",100,command_gassign) ||
 		command_add("ai","[factionid/spellslist/con/guard/roambox/stop/start] - Modify AI on NPC target",100,command_ai) ||
 		command_add("showspellslist","Shows spell list of targeted NPC",100,command_showspellslist) ||
@@ -254,21 +232,20 @@ int command_init(void) {
 		command_add("spawn","[name] [race] [level] [material] [hp] [gender] [class] [priweapon] [secweapon] [merchantid] - Spawn an NPC",10,command_spawn) ||
 		command_add("texture","[texture] [helmtexture] - Change your or your target's appearance, use 255 to show equipment",10,command_texture) ||
 		command_add("npctypespawn","[npctypeid] [factionid] - Spawn an NPC from the db",10,command_npctypespawn) ||
-		command_add("dbspawn",nullptr,0,command_npctypespawn) ||
+		command_add("dbspawn",nullptr,10,command_npctypespawn) ||
 		command_add("heal","- Completely heal your target",10,command_heal) ||
 		command_add("appearance","[type] [value] - Send an appearance packet for you or your target",150,command_appearance) ||
 		command_add("nukeitem","[itemid] - Remove itemid from your player target's inventory",150,command_nukeitem) ||
 		command_add("peekinv","[worn/inv/cursor/trib/bank/trade/world/all] - Print out contents of your player target's inventory",100,command_peekinv) ||
+		command_add("interrogateinv","- use [help] argument for available options",0,command_interrogateinv) ||
 		command_add("findnpctype","[search criteria] - Search database NPC types",100,command_findnpctype) ||
 		command_add("findzone","[search criteria] - Search database zones",100,command_findzone) ||
-		command_add("fz",nullptr,100, command_findzone) ||
 		command_add("viewnpctype","[npctype id] - Show info about an npctype",100,command_viewnpctype) ||
 		command_add("reloadstatic","- Reload Static Zone Data",150,command_reloadstatic) ||
 		command_add("reloadquest"," - Clear quest cache (any argument causes it to also stop all timers)",150,command_reloadqst) ||
 		command_add("reloadqst"," - Clear quest cache (any argument causes it to also stop all timers)",150,command_reloadqst) ||
 		command_add("reloadworld",nullptr,255,command_reloadworld) ||
 		command_add("reloadlevelmods",nullptr,255,command_reloadlevelmods) ||
-		command_add("rq",nullptr,0,command_reloadqst) ||
 		command_add("reloadzonepoints","- Reload zone points from database",150,command_reloadzps) ||
 		command_add("reloadzps",nullptr,0,command_reloadzps) ||
 		command_add("zoneshutdown","[shortname] - Shut down a zone server",150,command_zoneshutdown) ||
@@ -333,7 +310,6 @@ int command_init(void) {
 		command_add("manaburn","- Use AA Wizard class skill manaburn on target",10,command_manaburn) ||
 		command_add("doanim","[animnum] [type] - Send an EmoteAnim for you or your target",50,command_doanim) ||
 		command_add("randomfeatures","- Temporarily randomizes the Facial Features of your target",80,command_randomfeatures) ||
-		command_add("rf",nullptr,80,command_randomfeatures) ||
 		command_add("face","- Change the face of your target",80,command_face) ||
 		command_add("helm","- Change the helm of your target",80,command_helm) ||
 		command_add("hair","- Change the hair style of your target",80,command_hair) ||
@@ -348,7 +324,6 @@ int command_init(void) {
 		command_add("scribespell", "[spellid] - Scribe specified spell in your target's spell book.", 180, command_scribespell) ||
 		command_add("unscribespell", "[spellid] - Unscribe specified spell from your target's spell book.", 180, command_unscribespell) ||
 		command_add("interrupt","[message id] [color] - Interrupt your casting. Arguments are optional.",50,command_interrupt) ||
-		command_add("d1","[type] [spell] [damage] - Send an OP_Action packet with the specified values",200,command_d1) ||
 		command_add("summonitem","[itemid] [charges] - Summon an item onto your cursor. Charges are optional.",200,command_summonitem) ||
 		command_add("si",nullptr,200,command_summonitem) ||
 		command_add("giveitem","[itemid] [charges] - Summon an item onto your target's cursor. Charges are optional.",200,command_giveitem) ||
@@ -708,77 +683,6 @@ void command_resetaa(Client* c,const Seperator *sep){
 		c->Message(0,"Usage: Target a client and use #resetaa to reset the AA data in their Profile.");
 }
 
-void command_sendop(Client *c,const Seperator *sep){
-
-	int RezSpell = 0;
-
-	if(sep->arg[1][0]) {
-		RezSpell = atoi(sep->arg[1]);
-	}
-
-	EQApplicationPacket* outapp = new EQApplicationPacket(OP_RezzRequest, sizeof(Resurrect_Struct));
-	Resurrect_Struct *rs = (Resurrect_Struct*)outapp->pBuffer;
-
-	strcpy(rs->your_name, c->GetName());
-	strcpy(rs->rezzer_name, "A Cleric01");
-	rs->spellid = RezSpell;
-	DumpPacket(outapp);
-	c->QueuePacket(outapp);
-	safe_delete(outapp);
-	return;
-}
-
-void command_optest(Client *c, const Seperator *sep)
-{
-	if(sep->IsNumber(1))
-	{
-		switch(atoi(sep->arg[1]))
-		{
-			case 1:
-			{
-				EQApplicationPacket* outapp = new EQApplicationPacket(OP_AdventureFinish, sizeof(AdventureFinish_Struct));
-				AdventureFinish_Struct *af = (AdventureFinish_Struct*)outapp->pBuffer;
-				af->win_lose = 1;
-				af->points = 125;
-				c->FastQueuePacket(&outapp);
-				break;
-			}
-			case 2:
-			{
-				EQApplicationPacket* outapp = new EQApplicationPacket(OP_AdventureData, sizeof(AdventureRequestResponse_Struct));
-				AdventureRequestResponse_Struct *arr = (AdventureRequestResponse_Struct*)outapp->pBuffer;
-				if(sep->IsHexNumber(2))
-					arr->unknown000 = hextoi(sep->arg[2]);
-				else
-					arr->unknown000 = 0xBFC40100;
-				arr->risk = 1;
-				arr->showcompass = 1;
-				strcpy(arr->text, "This is some text for an adventure packet!\0");
-				arr->timeleft = 60*60;
-				//arr->timetoenter = 30*60;
-				if(sep->IsHexNumber(3))
-					arr->unknown2080=hextoi(sep->arg[3]);
-				else
-					arr->unknown2080=0x0A;
-				arr->x = c->GetY();
-				arr->y = c->GetX();
-				arr->z = c->GetZ();
-				c->FastQueuePacket(&outapp);
-				break;
-			}
-			case 3:
-			{
-				c->SendMarqueeMessage(15, 250, 0, 500, 5000, "Some msg");
-				break;
-			}
-			default:
-			{
-				break;
-			}
-		}
-	}
-}
-
 void command_help(Client *c, const Seperator *sep)
 {
 	int commands_shown=0;
@@ -837,50 +741,6 @@ void command_serversidename(Client *c, const Seperator *sep)
 		c->Message(0, "Error: no target");
 }
 
-void command_testspawnkill(Client *c, const Seperator *sep)
-{
-/*	EQApplicationPacket* outapp = new EQApplicationPacket(OP_Death, sizeof(Death_Struct));
-	Death_Struct* d = (Death_Struct*)outapp->pBuffer;
-	d->corpseid = 1000;
-	//	d->unknown011 = 0x05;
-	d->spawn_id = 1000;
-	d->killer_id = c->GetID();
-	d->damage = 1;
-	d->spell_id = 0;
-	d->type = BASH;
-	d->bindzoneid = 0;
-	c->FastQueuePacket(&outapp);*/
-}
-
-void command_testspawn(Client *c, const Seperator *sep)
-{
-	if (sep->IsNumber(1)) {
-		EQApplicationPacket* outapp = new EQApplicationPacket(OP_NewSpawn, sizeof(NewSpawn_Struct));
-		NewSpawn_Struct* ns = (NewSpawn_Struct*)outapp->pBuffer;
-		c->FillSpawnStruct(ns, c);
-		strcpy(ns->spawn.name, "Test");
-		ns->spawn.spawnId = 1000;
-		ns->spawn.NPC = 1;
-		if (sep->IsHexNumber(2)) {
-			if (strlen(sep->arg[2]) >= 3) // 0x00, 1 byte
-				*(&((uint8*) &ns->spawn)[atoi(sep->arg[1])]) = hextoi(sep->arg[2]);
-			else if (strlen(sep->arg[2]) >= 5) // 0x0000, 2 bytes
-				*((uint16*) &(((uint8*) &ns->spawn)[atoi(sep->arg[1])])) = hextoi(sep->arg[2]);
-			else if (strlen(sep->arg[2]) >= 9) // 0x0000, 2 bytes
-				*((uint32*) &(((uint8*) &ns->spawn)[atoi(sep->arg[1])])) = hextoi(sep->arg[2]);
-			else
-				c->Message(0, "Error: unexpected hex string length");
-		}
-		else {
-			strcpy((char*) (&((uint8*) &ns->spawn)[atoi(sep->arg[1])]), sep->argplus[2]);
-		}
-		EncryptSpawnPacket(outapp);
-		c->FastQueuePacket(&outapp);
-	}
-	else
-		c->Message(0, "Usage: #testspawn [memloc] [value] - spawns a NPC for you only, with the specified values set in the spawn struct");
-}
-
 void command_wc(Client *c, const Seperator *sep)
 {
 	if(sep->argnum < 2)
@@ -926,12 +786,6 @@ void command_wc(Client *c, const Seperator *sep)
 	}
 }
 
-void command_numauths(Client *c, const Seperator *sep)
-{
-	c->Message(0, "NumAuths: %i", zone->CountAuth());
-	c->Message(0, "Your WID: %i", c->GetWID());
-}
-
 void command_setanim(Client *c, const Seperator *sep)
 {
 	if (c->GetTarget() && sep->IsNumber(1)) {
@@ -971,13 +825,6 @@ char buffer[255];
 #endif
 }
 
-void command_crashtest(Client *c, const Seperator *sep)
-{
-	c->Message(0,"Alright, now we get an GPF ;) ");
-	char* gpf=0;
-	memcpy(gpf, "Ready to crash", 30);
-}
-
 void command_getvariable(Client *c, const Seperator *sep)
 {
 	char tmp[512];
@@ -995,71 +842,6 @@ void command_chat(Client *c, const Seperator *sep)
 		if (!worldserver.SendChannelMessage(0, 0, (uint8) atoi(sep->arg[1]), 0, 0, sep->argplus[2]))
 			c->Message(0, "Error: World server disconnected");
 }
-
-void command_showpetspell(Client *c, const Seperator *sep)
-{
-	if (sep->arg[1][0] == 0)
-		c->Message(0, "Usage: #ShowPetSpells [spellid | searchstring]");
-	else if (SPDAT_RECORDS <= 0)
-		c->Message(0, "Spells not loaded");
-	else if (Seperator::IsNumber(sep->argplus[1]))
-	{
-		int spellid = atoi(sep->argplus[1]);
-		if (spellid <= 0 || spellid >= SPDAT_RECORDS)
-			c->Message(0, "Error: Number out of range");
-		else
-			c->Message(0, "	%i: %s, %s", spellid, spells[spellid].teleport_zone, spells[spellid].name);
-	}
-	else
-	{
-		int count=0;
-		char sName[64];
-		char sCriteria[65];
-		strn0cpy(sCriteria, sep->argplus[1], 64);
-		strupr(sCriteria);
-		for (int i = 0; i < SPDAT_RECORDS; i++)
-		{
-			if (spells[i].name[0] != 0 && (spells[i].effectid[0] == SE_SummonPet || spells[i].effectid[0] == SE_NecPet))
-			{
-				strcpy(sName, spells[i].teleport_zone);
-				strupr(sName);
-				char* pdest = strstr(sName, sCriteria);
-				if ((pdest != nullptr) && (count <=20))
-				{
-					c->Message(0, "	%i: %s, %s", i, spells[i].teleport_zone, spells[i].name);
-					count++;
-				}
-				else if (count > 20)
-					break;
-			}
-		}
-		if (count > 20)
-			c->Message(0, "20 spells found... max reached.");
-		else
-			c->Message(0, "%i spells found.", count);
-	}
-}
-
-#ifdef IPC
-void command_ipc(Client *c, const Seperator *sep)
-{
-	if (c->GetTarget() && c->GetTarget()->IsNPC())
-	{
-		if (c->GetTarget()->CastToNPC()->IsInteractive())
-		{
-			c->GetTarget()->CastToNPC()->interactive = false;
-			c->Message(0, "Disabling IPC");
-		}
-		else
-		{
-			c->GetTarget()->CastToNPC()->interactive = true;
-			c->Message(0, "Enabling IPC");
-		}
-	}
-	else
-		c->Message(0, "Error: You must target an NPC");
-}
-#endif /* IPC */
 
 void command_npcloot(Client *c, const Seperator *sep)
 {
@@ -1640,16 +1422,6 @@ void command_timezone(Client *c, const Seperator *sep)
 	}
 }
 
-void command_synctod(Client *c, const Seperator *sep)
-{
-	c->Message(13, "Updating Time/Date for all clients in zone...");
-	EQApplicationPacket* outapp = new EQApplicationPacket(OP_TimeOfDay, sizeof(TimeOfDay_Struct));
-	TimeOfDay_Struct* tod = (TimeOfDay_Struct*)outapp->pBuffer;
-	zone->zone_time.getEQTimeOfDay(time(0), tod);
-	entity_list.QueueClients(c, outapp);
-	safe_delete(outapp);
-}
-
 void command_invul(Client *c, const Seperator *sep)
 {
 	bool state=atobool(sep->arg[1]);
@@ -1711,15 +1483,6 @@ void command_fov(Client *c, const Seperator *sep)
 			c->Message(0, "You are NOT behind mob %s, it is looking to %d", c->GetTarget()->GetName(), c->GetTarget()->GetHeading());
 	else
 		c->Message(0, "I Need a target!");
-}
-
-void command_manastat(Client *c, const Seperator *sep)
-{
-	Mob *target=c->GetTarget()?c->GetTarget():c;
-
-	c->Message(0, "Mana for %s:", target->GetName());
-	c->Message(0, "  Current Mana: %d",target->GetMana());
-	c->Message(0, "  Max Mana: %d",target->GetMaxMana());
 }
 
 void command_npcstats(Client *c, const Seperator *sep)
@@ -2774,238 +2537,382 @@ void command_nukeitem(Client *c, const Seperator *sep)
 
 void command_peekinv(Client *c, const Seperator *sep)
 {
-	// Displays what the server thinks the user has in inventory
+	enum {
+		peekWorn = 0x01,
+		peekInv = 0x02,
+		peekCursor = 0x04,
+		peekTrib = 0x08,
+		peekBank = 0x10,
+		peekTrade = 0x20,
+		peekWorld = 0x40
+	} ;
+	
 	if (!c->GetTarget() || !c->GetTarget()->IsClient()) {
 		c->Message(0, "You must have a PC target selected for this command");
 		return;
 	}
 
-	// linkcore_# indicates the number of consecutive 0's..not the actual length
-	const std::string linkcore_49 = "%c%06X0000000000000000000000000000000000000000000000000%s%c";	// RoF+
-	const std::string linkcore_44 = "%c%06X00000000000000000000000000000000000000000000%s%c";		// SoF->UF
-	const std::string linkcore_39 = "%c%06X000000000000000000000000000000000000000%s%c";			// 6.2->Ti
-	const char* linkcore = nullptr;
-	std::string linkbase = "";
+	int scopeWhere = 0;
 
-	// consider pushing 'linkcores' to EQLimits
-	if (c->GetClientVersion() >= EQClientRoF)
-		linkcore = linkcore_49.c_str();
-	else if (c->GetClientVersion() >= EQClientSoF)
-		linkcore = linkcore_44.c_str();
-	else
-		linkcore = linkcore_39.c_str();
+	if (strcasecmp(sep->arg[1], "all") == 0) { scopeWhere = ~0; }
+	else if (strcasecmp(sep->arg[1], "worn") == 0) { scopeWhere |= peekWorn; }
+	else if (strcasecmp(sep->arg[1], "inv") == 0) { scopeWhere |= peekInv; }
+	else if (strcasecmp(sep->arg[1], "cursor") == 0) { scopeWhere |= peekCursor; }
+	else if (strcasecmp(sep->arg[1], "trib") == 0) { scopeWhere |= peekTrib; }
+	else if (strcasecmp(sep->arg[1], "bank") == 0) { scopeWhere |= peekBank; }
+	else if (strcasecmp(sep->arg[1], "trade") == 0) { scopeWhere |= peekTrade; }
+	else if (strcasecmp(sep->arg[1], "world") == 0) { scopeWhere |= peekWorld; }
 
-	bool bAll = (strcasecmp(sep->arg[1], "all") == 0);
-	bool bFound = false;
-	Client* client = c->GetTarget()->CastToClient();
-	const Item_Struct* item = nullptr;
-	c->Message(0, "Displaying inventory for %s...", client->GetName());
-
-	if (bAll || (strcasecmp(sep->arg[1], "worn")==0)) {
-		// Worn items
-		bFound = true;
-		for (int16 i = EmuConstants::EQUIPMENT_BEGIN; i <= EmuConstants::EQUIPMENT_END; i++) {
-			const ItemInst* inst = client->GetInv().GetItem(i);
-			item = (inst) ? inst->GetItem() : nullptr;
-
-			linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-			c->Message((item == 0), "WornSlot: %i, Item: %i (%s), Charges: %i",
-				i, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
-		}
-		if (c->GetClientVersion() >= EQClientSoF)
-		{
-			const ItemInst* inst = client->GetInv().GetItem(MainPowerSource);
-			item = (inst) ? inst->GetItem() : nullptr;
-
-			linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-			c->Message((item == 0), "WornSlot: %i, Item: %i (%s), Charges: %i",
-				MainPowerSource, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
-		}
-
+	if (scopeWhere == 0) {
+		c->Message(0, "Usage: #peekinv [worn|inv|cursor|trib|bank|trade|world|all]");
+		c->Message(0, "  Displays a portion of the targeted user's inventory");
+		c->Message(0, "  Caution: 'all' is a lot of information!");
+		return;
 	}
 
-	if (bAll || (strcasecmp(sep->arg[1], "inv")==0)) {
-		// Personal inventory items
-		bFound = true;
-		for (int16 i = EmuConstants::GENERAL_BEGIN; i <= EmuConstants::GENERAL_END; i++) {
-			const ItemInst* inst = client->GetInv().GetItem(i);
-			item = (inst) ? inst->GetItem() : nullptr;
+	Client* targetClient = c->GetTarget()->CastToClient();
+	const ItemInst* instMain = nullptr;
+	const ItemInst* instSub = nullptr;
+	const Item_Struct* itemData = nullptr;
+	char* itemLinkCore = nullptr;
+	std::string itemLink;
 
-			linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-			c->Message((item == 0), "InvSlot: %i, Item: %i (%s), Charges: %i",
-				i, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
+	c->Message(0, "Displaying inventory for %s...", targetClient->GetName());
 
-			if (inst && inst->IsType(ItemClassContainer)) {
-				for (uint8 j = SUB_BEGIN; j < EmuConstants::ITEM_CONTAINER_SIZE; j++) {
-					const ItemInst* instbag = client->GetInv().GetItem(i, j);
-					item = (instbag) ? instbag->GetItem() : nullptr;
+	// worn
+	for (int16 indexMain = EmuConstants::EQUIPMENT_BEGIN; (scopeWhere & peekWorn) && (indexMain <= EmuConstants::EQUIPMENT_END); ++indexMain) {
+		instMain = targetClient->GetInv().GetItem(indexMain);
+		itemData = (instMain ? instMain->GetItem() : nullptr);
+		itemLinkCore = nullptr;
 
-					linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-					c->Message((item == 0), "  InvBagSlot: %i (Slot #%i, Bag #%i), Item: %i (%s), Charges: %i",
-						Inventory::CalcSlotId(i, j), i, j, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
-				}
-			}
+		if (itemData)
+			c->MakeItemLink(itemLinkCore, instMain);
+
+		itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instMain->GetItem()->Name, 0x12) : "null");
+
+		c->Message((itemData == 0), "WornSlot: %i, Item: %i (%s), Charges: %i",
+			indexMain, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instMain->GetCharges()));
+
+		safe_delete_array(itemLinkCore);
+	}
+
+	if ((scopeWhere & peekWorn) && (targetClient->GetClientVersion() >= EQClientSoF)) {
+		instMain = targetClient->GetInv().GetItem(MainPowerSource);
+		itemData = (instMain ? instMain->GetItem() : nullptr);
+		itemLinkCore = nullptr;
+		
+		if (itemData)
+			c->MakeItemLink(itemLinkCore, instMain);
+		
+		itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instMain->GetItem()->Name, 0x12) : "null");
+
+		c->Message((itemData == 0), "WornSlot: %i, Item: %i (%s), Charges: %i",
+			MainPowerSource, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instMain->GetCharges()));
+
+		safe_delete_array(itemLinkCore);
+	}
+
+	// inv
+	for (int16 indexMain = EmuConstants::GENERAL_BEGIN; (scopeWhere & peekInv) && (indexMain <= EmuConstants::GENERAL_END); ++indexMain) {
+		instMain = targetClient->GetInv().GetItem(indexMain);
+		itemData = (instMain ? instMain->GetItem() : nullptr);
+		itemLinkCore = nullptr;
+
+		if (itemData)
+			c->MakeItemLink(itemLinkCore, instMain);
+		
+		itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instMain->GetItem()->Name, 0x12) : "null");
+		
+		c->Message((itemData == 0), "InvSlot: %i, Item: %i (%s), Charges: %i",
+			indexMain, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instMain->GetCharges()));
+
+		safe_delete_array(itemLinkCore);
+
+		for (uint8 indexSub = SUB_BEGIN; instMain && instMain->IsType(ItemClassContainer) && (indexSub < EmuConstants::ITEM_CONTAINER_SIZE); ++indexSub) {
+			instSub = instMain->GetItem(indexSub);
+			itemData = (instSub ? instSub->GetItem() : nullptr);
+			itemLinkCore = nullptr;
+
+			if (itemData)
+				c->MakeItemLink(itemLinkCore, instSub);
+			
+			itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instSub->GetItem()->Name, 0x12) : "null");
+			
+			c->Message((itemData == 0), "  InvBagSlot: %i (Slot #%i, Bag #%i), Item: %i (%s), Charges: %i",
+				Inventory::CalcSlotId(indexMain, indexSub), indexMain, indexSub, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instSub->GetCharges()));
+
+			safe_delete_array(itemLinkCore);
 		}
 	}
 
-	// Changed to show 'empty' cursors and not to show bag slots on 'queued' cursor slots (cursor bag slots 331 to 340 are not arrayed...)
-	// - was pointless to show bags on anything after slot 30[0], because it only repeated the 30[0] bag items.
-	if (bAll || (strcasecmp(sep->arg[1], "cursor")==0)) {
-		// Personal inventory items
-		bFound = true;
-		iter_queue it;
-		int i = 0;
-
-		if(client->GetInv().CursorEmpty()) { // Display 'front' cursor slot even if 'empty' (item(30[0]) == null)
-			linkbase = StringFormat(linkcore, 0x12, 0, "null", 0x12);
-			c->Message((item == 0), "CursorSlot: %i, Item: %i (%s), Charges: %i",
-				MainCursor, 0, linkbase.c_str(), 0);
+	// cursor
+	if (scopeWhere & peekCursor) {
+		if (targetClient->GetInv().CursorEmpty()) {
+			c->Message(1, "CursorSlot: %i, Item: %i (%s), Charges: %i",
+				MainCursor, 0, "null", 0);
 		}
 		else {
-			for(it=client->GetInv().cursor_begin();it!=client->GetInv().cursor_end();++it,i++) {
-				const ItemInst* inst = *it;
-				item = (inst) ? inst->GetItem() : nullptr;
+			int cursorDepth = 0;
+			for (iter_queue it = targetClient->GetInv().cursor_begin(); (it != targetClient->GetInv().cursor_end()); ++it, ++cursorDepth) {
+				instMain = *it;
+				itemData = (instMain ? instMain->GetItem() : nullptr);
+				itemLinkCore = nullptr;
 
-				linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-				c->Message((item == 0), "CursorSlot: %i, Depth: %i, Item: %i (%s), Charges: %i",
-					MainCursor, i, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
+				if (itemData)
+					c->MakeItemLink(itemLinkCore, instMain);
+				
+				itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instMain->GetItem()->Name, 0x12) : "null");
+				
+				c->Message((itemData == 0), "CursorSlot: %i, Depth: %i, Item: %i (%s), Charges: %i",
+					MainCursor, cursorDepth, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instMain->GetCharges()));
 
-				if (inst && inst->IsType(ItemClassContainer) && i==0) { // 'CSD 1' - only display contents of slot 30[0] container..higher ones don't exist
-					for (uint8 j = SUB_BEGIN; j < EmuConstants::ITEM_CONTAINER_SIZE; j++) {
-						const ItemInst* instbag = client->GetInv().GetItem(MainCursor, j);
-						item = (instbag) ? instbag->GetItem() : nullptr;
+				safe_delete_array(itemLinkCore);
 
-						linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-						c->Message((item == 0), "  CursorBagSlot: %i (Slot #%i, Bag #%i), Item: %i (%s), Charges: %i",
-							Inventory::CalcSlotId(MainCursor, j), MainCursor, j, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
-					}
+				for (uint8 indexSub = SUB_BEGIN; (cursorDepth == 0) && instMain && instMain->IsType(ItemClassContainer) && (indexSub < EmuConstants::ITEM_CONTAINER_SIZE); ++indexSub) {
+					instSub = instMain->GetItem(indexSub);
+					itemData = (instSub ? instSub->GetItem() : nullptr);
+					itemLinkCore = nullptr;
+
+					if (itemData)
+						c->MakeItemLink(itemLinkCore, instSub);
+					
+					itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instSub->GetItem()->Name, 0x12) : "null");
+					
+					c->Message((itemData == 0), "  CursorBagSlot: %i (Slot #%i, Bag #%i), Item: %i (%s), Charges: %i",
+						Inventory::CalcSlotId(MainCursor, indexSub), MainCursor, indexSub, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instSub->GetCharges()));
+
+					safe_delete_array(itemLinkCore);
 				}
 			}
 		}
 	}
 
-	if (bAll || (strcasecmp(sep->arg[1], "trib")==0)) {
-		// Active tribute effect items
-		bFound = true;
-		for (int16 i = EmuConstants::TRIBUTE_BEGIN; i <= EmuConstants::TRIBUTE_END; i++) {
-			const ItemInst* inst = client->GetInv().GetItem(i);
-			item = (inst) ? inst->GetItem() : nullptr;
+	// trib
+	for (int16 indexMain = EmuConstants::TRIBUTE_BEGIN; (scopeWhere & peekTrib) && (indexMain <= EmuConstants::TRIBUTE_END); ++indexMain) {
+		instMain = targetClient->GetInv().GetItem(indexMain);
+		itemData = (instMain ? instMain->GetItem() : nullptr);
+		itemLinkCore = nullptr;
 
-			linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-			c->Message((item == 0), "TributeSlot: %i, Item: %i (%s), Charges: %i",
-				i, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
+		if (itemData)
+			c->MakeItemLink(itemLinkCore, instMain);
+		
+		itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instMain->GetItem()->Name, 0x12) : "null");
+		
+		c->Message((itemData == 0), "TributeSlot: %i, Item: %i (%s), Charges: %i",
+			indexMain, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instMain->GetCharges()));
+
+		safe_delete_array(itemLinkCore);
+	}
+
+	// bank
+	for (int16 indexMain = EmuConstants::BANK_BEGIN; (scopeWhere & peekBank) && (indexMain <= EmuConstants::BANK_END); ++indexMain) {
+		instMain = targetClient->GetInv().GetItem(indexMain);
+		itemData = (instMain ? instMain->GetItem() : nullptr);
+		itemLinkCore = nullptr;
+
+		if (itemData)
+			c->MakeItemLink(itemLinkCore, instMain);
+		
+		itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instMain->GetItem()->Name, 0x12) : "null" );
+		
+		c->Message((itemData == 0), "BankSlot: %i, Item: %i (%s), Charges: %i",
+			indexMain, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instMain->GetCharges()));
+
+		safe_delete_array(itemLinkCore);
+
+		for (uint8 indexSub = SUB_BEGIN; instMain && instMain->IsType(ItemClassContainer) && (indexSub < EmuConstants::ITEM_CONTAINER_SIZE); ++indexSub) {
+			instSub = instMain->GetItem(indexSub);
+			itemData = (instSub ? instSub->GetItem() : nullptr);
+			itemLinkCore = nullptr;
+
+			if (itemData)
+				c->MakeItemLink(itemLinkCore, instSub);
+			
+			itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instSub->GetItem()->Name, 0x12) : "null");
+			
+			c->Message((itemData == 0), "  BankBagSlot: %i (Slot #%i, Bag #%i), Item: %i (%s), Charges: %i",
+				Inventory::CalcSlotId(indexMain, indexSub), indexMain, indexSub, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instSub->GetCharges()));
+
+			safe_delete_array(itemLinkCore);
 		}
 	}
 
-	if (bAll || (strcasecmp(sep->arg[1], "bank")==0)) {
-		// Bank and shared bank items
-		bFound = true;
-		int16 i = 0;
-		for (i = EmuConstants::BANK_BEGIN; i <= EmuConstants::BANK_END; i++) {
-			const ItemInst* inst = client->GetInv().GetItem(i);
-			item = (inst) ? inst->GetItem() : nullptr;
+	for (int16 indexMain = EmuConstants::SHARED_BANK_BEGIN; (scopeWhere & peekBank) && (indexMain <= EmuConstants::SHARED_BANK_END); ++indexMain) {
+		instMain = targetClient->GetInv().GetItem(indexMain);
+		itemData = (instMain ? instMain->GetItem() : nullptr);
+		itemLinkCore = nullptr;
 
-			linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-			c->Message((item == 0), "BankSlot: %i, Item: %i (%s), Charges: %i",
-				i, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
+		if (itemData)
+			c->MakeItemLink(itemLinkCore, instMain);
+		
+		itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instMain->GetItem()->Name, 0x12) : "null");
+		
+		c->Message((itemData == 0), "SharedBankSlot: %i, Item: %i (%s), Charges: %i",
+			indexMain, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instMain->GetCharges()));
 
-			if (inst && inst->IsType(ItemClassContainer)) {
-				for (uint8 j = SUB_BEGIN; j < EmuConstants::ITEM_CONTAINER_SIZE; j++) {
-					const ItemInst* instbag = client->GetInv().GetItem(i, j);
-					item = (instbag) ? instbag->GetItem() : nullptr;
+		safe_delete_array(itemLinkCore);
 
-					linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-					c->Message((item == 0), "  BankBagSlot: %i (Slot #%i, Bag #%i), Item: %i (%s), Charges: %i",
-						Inventory::CalcSlotId(i, j), i, j, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
-				}
-			}
-		}
-		for (i = EmuConstants::SHARED_BANK_BEGIN; i <= EmuConstants::SHARED_BANK_END; i++) {
-			const ItemInst* inst = client->GetInv().GetItem(i);
-			item = (inst) ? inst->GetItem() : nullptr;
+		for (uint8 indexSub = SUB_BEGIN; instMain && instMain->IsType(ItemClassContainer) && (indexSub < EmuConstants::ITEM_CONTAINER_SIZE); ++indexSub) {
+			instSub = instMain->GetItem(indexSub);
+			itemData = (instSub ? instSub->GetItem() : nullptr);
+			itemLinkCore = nullptr;
 
-			linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-			c->Message((item == 0), "SharedBankSlot: %i, Item: %i (%s), Charges: %i",
-				i, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
+			if (itemData)
+				c->MakeItemLink(itemLinkCore, instSub);
+			
+			itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instSub->GetItem()->Name, 0x12) : "null");
+			
+			c->Message((itemData == 0), "  SharedBankBagSlot: %i (Slot #%i, Bag #%i), Item: %i (%s), Charges: %i",
+				Inventory::CalcSlotId(indexMain, indexSub), indexMain, indexSub, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instSub->GetCharges()));
 
-			if (inst && inst->IsType(ItemClassContainer)) {
-				for (uint8 j = SUB_BEGIN; j < EmuConstants::ITEM_CONTAINER_SIZE; j++) {
-					const ItemInst* instbag = client->GetInv().GetItem(i, j);
-					item = (instbag) ? instbag->GetItem() : nullptr;
-
-					linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-					c->Message((item == 0), "  SharedBankBagSlot: %i (Slot #%i, Bag #%i), Item: %i (%s), Charges: %i",
-						Inventory::CalcSlotId(i, j), i, j, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
-				}
-			}
+			safe_delete_array(itemLinkCore);
 		}
 	}
 
-	if (bAll || (strcasecmp(sep->arg[1], "trade")==0)) {
-		// Items in trade window (current trader only, not the other trader)
-		bFound = true;
-		for (int16 i = EmuConstants::TRADE_BEGIN; i <= EmuConstants::TRADE_END; i++) {
-			const ItemInst* inst = client->GetInv().GetItem(i);
-			item = (inst) ? inst->GetItem() : nullptr;
+	// trade
+	for (int16 indexMain = EmuConstants::TRADE_BEGIN; (scopeWhere & peekTrade) && (indexMain <= EmuConstants::TRADE_END); ++indexMain) {
+		instMain = targetClient->GetInv().GetItem(indexMain);
+		itemData = (instMain ? instMain->GetItem() : nullptr);
+		itemLinkCore = nullptr;
 
-			linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-			c->Message((item == 0), "TradeSlot: %i, Item: %i (%s), Charges: %i",
-				i, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
+		if (itemData)
+			c->MakeItemLink(itemLinkCore, instMain);
+		
+		itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instMain->GetItem()->Name, 0x12) : "null");
+		
+		c->Message((itemData == 0), "TradeSlot: %i, Item: %i (%s), Charges: %i",
+			indexMain, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instMain->GetCharges()));
 
-			if (inst && inst->IsType(ItemClassContainer)) {
-				for (uint8 j = SUB_BEGIN; j < EmuConstants::ITEM_CONTAINER_SIZE; j++) {
-					const ItemInst* instbag = client->GetInv().GetItem(i, j);
-					item = (instbag) ? instbag->GetItem() : nullptr;
+		safe_delete_array(itemLinkCore);
 
-					linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-					c->Message((item == 0), "  TradeBagSlot: %i (Slot #%i, Bag #%i), Item: %i (%s), Charges: %i",
-						Inventory::CalcSlotId(i, j), i, j, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
-				}
-			}
+		for (uint8 indexSub = SUB_BEGIN; instMain && instMain->IsType(ItemClassContainer) && (indexSub < EmuConstants::ITEM_CONTAINER_SIZE); ++indexSub) {
+			instSub = instMain->GetItem(indexSub);
+			itemData = (instSub ? instSub->GetItem() : nullptr);
+			itemLinkCore = nullptr;
+
+			if (itemData)
+				c->MakeItemLink(itemLinkCore, instSub);
+			
+			itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instSub->GetItem()->Name, 0x12) : "null");
+			
+			c->Message((itemData == 0), "  TradeBagSlot: %i (Slot #%i, Bag #%i), Item: %i (%s), Charges: %i",
+				Inventory::CalcSlotId(indexMain, indexSub), indexMain, indexSub, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instSub->GetCharges()));
+
+			safe_delete_array(itemLinkCore);
 		}
 	}
 
-	if (bAll || (strcasecmp(sep->arg[1], "world") == 0)) {
-		// Items in world container (if present)
-		bFound = true;
+	// world
+	if (scopeWhere & peekWorld) {
+		Object* objectTradeskill = targetClient->GetTradeskillObject();
 
-		Object* tsobject = c->GetTradeskillObject();
-
-		if (tsobject == nullptr) {
+		if (objectTradeskill == nullptr) {
 			c->Message(1, "No world tradeskill object selected...");
 		}
 		else {
-			c->Message(0, "[WorldObject DBID: %i (entityid: %i)]", tsobject->GetDBID(), tsobject->GetID());
+			c->Message(0, "[WorldObject DBID: %i (entityid: %i)]", objectTradeskill->GetDBID(), objectTradeskill->GetID());
 
-			for (int16 i = MAIN_BEGIN; i < EmuConstants::MAP_WORLD_SIZE; ++i) {
-				const ItemInst* inst = tsobject->GetItem(i);
-				item = (inst) ? inst->GetItem() : nullptr;
+			for (int16 indexMain = MAIN_BEGIN; indexMain < EmuConstants::MAP_WORLD_SIZE; ++indexMain) {
+				instMain = objectTradeskill->GetItem(indexMain);
+				itemData = (instMain ? instMain->GetItem() : nullptr);
+				itemLinkCore = nullptr;
 
-				linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-				c->Message((item == 0), "WorldSlot: %i, Item: %i (%s), Charges: %i",
-					(EmuConstants::WORLD_BEGIN + i), ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
+				if (itemData)
+					c->MakeItemLink(itemLinkCore, instMain);
+				
+				itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instMain->GetItem()->Name, 0x12) : "null");
+				
+				c->Message((itemData == 0), "WorldSlot: %i, Item: %i (%s), Charges: %i",
+					(EmuConstants::WORLD_BEGIN + indexMain), ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instMain->GetCharges()));
 
-				// this should never happen ('WorldBagSlot' as -1 indicates an error state in this implementation)
-				if (inst && inst->IsType(ItemClassContainer)) {
-					for (uint8 j = SUB_BEGIN; j < EmuConstants::ITEM_CONTAINER_SIZE; ++j) {
-						const ItemInst* instbag = inst->GetItem(j);
-						item = (instbag) ? instbag->GetItem() : nullptr;
+				safe_delete_array(itemLinkCore);
 
-						linkbase = StringFormat(linkcore, 0x12, ((item == 0) ? 0 : item->ID), ((item == 0) ? "null" : item->Name), 0x12);
-						c->Message((item == 0), "  WorldBagSlot: %i (Slot #%i, Bag #%i), Item: %i (%s), Charges: %i",
-							-1, i, j, ((item == 0) ? 0 : item->ID), linkbase.c_str(), ((item == 0) ? 0 : inst->GetCharges()));
-					}
+				for (uint8 indexSub = SUB_BEGIN; instMain && instMain->IsType(ItemClassContainer) && (indexSub < EmuConstants::ITEM_CONTAINER_SIZE); ++indexSub) {
+					instSub = instMain->GetItem(indexSub);
+					itemData = (instSub ? instSub->GetItem() : nullptr);
+					itemLinkCore = nullptr;
+
+					if (itemData)
+						c->MakeItemLink(itemLinkCore, instSub);
+					
+					itemLink = (itemLinkCore ? StringFormat("%c%s%s%c", 0x12, itemLinkCore, instSub->GetItem()->Name, 0x12) : "null");
+					
+					c->Message((itemData == 0), "  WorldBagSlot: %i (Slot #%i, Bag #%i), Item: %i (%s), Charges: %i",
+						INVALID_INDEX, indexMain, indexSub, ((itemData == 0) ? 0 : itemData->ID), itemLink.c_str(), ((itemData == 0) ? 0 : instSub->GetCharges()));
+
+					safe_delete_array(itemLinkCore);
 				}
 			}
 		}
 	}
+}
 
-	if (!bFound)
-	{
-		c->Message(0, "Usage: #peekinv [worn|cursor|inv|bank|trade|trib|all]");
-		c->Message(0, "  Displays a portion of the targeted user's inventory");
-		c->Message(0, "  Caution: 'all' is a lot of information!");
+void command_interrogateinv(Client *c, const Seperator *sep)
+{
+	// 'command_interrogateinv' is an in-memory inventory interrogation tool only.
+	//
+	// it does not verify against actual database entries..but, the output can be
+	// used to verify that something has been corrupted in a player's inventory.
+	// any error condition should be assumed that the item in question will be
+	// lost when the player logs out or zones (or incurrs any action that will
+	// consume the Client-Inventory object instance in question.)
+	//
+	// any item instances located at a greater depth than a reported error should
+	// be treated as an error themselves regardless of whether they report as the
+	// same or not.
+
+	if (strcasecmp(sep->arg[1], "help") == 0) {
+		if (c->Admin() < commandInterrogateInv) {
+			c->Message(0, "Usage: #interrogateinv");
+			c->Message(0, "  Displays your inventory's current in-memory nested storage references");
+		}
+		else {
+			c->Message(0, "Usage: #interrogateinv [log] [silent]");
+			c->Message(0, "  Displays your or your Player target inventory's current in-memory nested storage references");
+			c->Message(0, "  [log] - Logs interrogation to file");
+			c->Message(0, "  [silent] - Omits the in-game message portion of the interrogation");
+		}
+		return;
 	}
+
+	Client* target = nullptr;
+	std::map<int16, const ItemInst*> instmap;
+	bool log = false;
+	bool silent = false;
+	bool error = false;
+	bool allowtrip = false;
+
+	if (c->Admin() < commandInterrogateInv) {
+		if (c->GetInterrogateInvState()) {
+			c->Message(13, "The last use of #interrogateinv on this inventory instance discovered an error...");
+			c->Message(13, "Logging out, zoning or re-arranging items at this point will result in item loss!");
+			return;
+		}
+		target = c;
+		allowtrip = true;
+	}
+	else {
+		if (c->GetTarget() == nullptr) {
+			target = c;
+		}
+		else if (c->GetTarget()->IsClient()) {
+			target = c->GetTarget()->CastToClient();
+		}
+		else {
+			c->Message(1, "Use of this command is limited to Client entities");
+			return;
+		}
+
+		if (strcasecmp(sep->arg[1], "log") == 0)
+			log = true;
+		if (strcasecmp(sep->arg[2], "silent") == 0)
+			silent = true;
+	}
+
+	bool success = target->InterrogateInventory(c, log, silent, allowtrip, error);
+
+	if (!success)
+		c->Message(13, "An unknown error occurred while processing Client::InterrogateInventory()");
 }
 
 void command_findnpctype(Client *c, const Seperator *sep)
@@ -3509,7 +3416,7 @@ void command_corpse(Client *c, const Seperator *sep)
 			c->Message(0, "Error: Target must be a player corpse.");
 		else if (c->Admin() >= commandEditPlayerCorpses && target->IsPlayerCorpse()) {
 			c->Message(0, "Depoping %s.", target->GetName());
-			target->CastToCorpse()->DepopCorpse();
+			target->CastToCorpse()->DepopPlayerCorpse();
 			if(!sep->arg[2][0] || atoi(sep->arg[2]) != 0)
 				target->CastToCorpse()->Bury();
 		}
@@ -3994,7 +3901,7 @@ void command_save(Client *c, const Seperator *sep)
 	}
 	else if (c->GetTarget()->IsPlayerCorpse()) {
 		if (c->GetTarget()->CastToMob()->Save())
-			c->Message(0, "%s successfully saved. (dbid=%u)", c->GetTarget()->GetName(), c->GetTarget()->CastToCorpse()->GetDBID());
+			c->Message(0, "%s successfully saved. (dbid=%u)", c->GetTarget()->GetName(), c->GetTarget()->CastToCorpse()->GetCorpseDBID());
 		else
 			c->Message(0, "Manual save for %s failed.", c->GetTarget()->GetName());
 	}
@@ -5768,19 +5675,6 @@ void command_interrupt(Client *c, const Seperator *sep)
 		ci_color=atoi(sep->arg[2]);
 
 	c->InterruptSpell(ci_message, ci_color);
-}
-
-void command_d1(Client *c, const Seperator *sep)
-{
-	EQApplicationPacket app(OP_Action, sizeof(Action_Struct));
-	Action_Struct* a = (Action_Struct*)app.pBuffer;
-	a->target = c->GetTarget()->GetID();
-	a->source = c->GetID();
-	a->type = atoi(sep->arg[1]);
-	a->spell = atoi(sep->arg[2]);
-	a->sequence = atoi(sep->arg[3]);
-	app.priority = 1;
-	entity_list.QueueCloseClients(c, &app);
 }
 
 void command_summonitem(Client *c, const Seperator *sep)
@@ -8557,7 +8451,7 @@ void command_setgraveyard(Client *c, const Seperator *sep)
 	zoneid = database.GetZoneID(sep->arg[1]);
 
 	if(zoneid > 0) {
-		graveyard_id = database.NewGraveyardRecord(zoneid, t->GetX(), t->GetY(), t->GetZ(), t->GetHeading());
+		graveyard_id = database.CreateGraveyardRecord(zoneid, t->GetX(), t->GetY(), t->GetZ(), t->GetHeading());
 
 		if(graveyard_id > 0) {
 			c->Message(0, "Successfuly added a new record for this graveyard!");
@@ -8620,7 +8514,7 @@ void command_summonburriedplayercorpse(Client *c, const Seperator *sep)
 		return;
 	}
 
-	Corpse* PlayerCorpse = database.SummonBurriedPlayerCorpse(t->CharacterID(), t->GetZoneID(), zone->GetInstanceID(), t->GetX(), t->GetY(), t->GetZ(), t->GetHeading());
+	Corpse* PlayerCorpse = database.SummonBuriedCharacterCorpses(t->CharacterID(), t->GetZoneID(), zone->GetInstanceID(), t->GetX(), t->GetY(), t->GetZ(), t->GetHeading());
 
 	if(!PlayerCorpse)
 		c->Message(0, "Your target doesn't have any burried corpses.");
@@ -8639,7 +8533,7 @@ void command_getplayerburriedcorpsecount(Client *c, const Seperator *sep)
 		return;
 	}
 
-	uint32 CorpseCount = database.GetPlayerBurriedCorpseCount(t->CharacterID());
+	uint32 CorpseCount = database.GetCharacterBuriedCorpseCount(t->CharacterID());
 
 	if(CorpseCount > 0)
 		c->Message(0, "Your target has a total of %u burried corpses.", CorpseCount);
@@ -10102,7 +9996,8 @@ void command_object(Client *c, const Seperator *sep)
 
         // Couldn't copy the object.
 
-        if (results.ErrorMessage().c_str() != '\0') {
+        // got an error message
+        if (!results.Success()) {
             c->Message(0, "Database Error: %s", results.ErrorMessage().c_str());
             return;
         }
@@ -10723,28 +10618,6 @@ void command_picklock(Client *c, const Seperator *sep)
 		}
 		else
 			c->Message(13, "You do not have the pick locks skill.");
-	}
-}
-
-void command_qtest(Client *c, const Seperator *sep)
-{
-
-
-	if(c && sep->arg[1][0])
-	{
-		if(c->GetTarget())
-		{
-	ServerPacket* pack = new ServerPacket(ServerOP_Speech, sizeof(Server_Speech_Struct)+strlen(sep->arg[1])+1);
-	Server_Speech_Struct* sem = (Server_Speech_Struct*) pack->pBuffer;
-	strcpy(sem->message, sep->arg[1]);
-	sem->minstatus = c->Admin();
-	sem->type = 1;
-	strncpy(sem->to,c->GetTarget()->GetCleanName(), 64);
-	strncpy(sem->to,c->GetCleanName(), 64);
-	sem->guilddbid = c->GuildID();
-	worldserver.SendPacket(pack);
-	safe_delete(pack);
-		}
 	}
 }
 

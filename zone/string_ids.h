@@ -264,6 +264,7 @@
 #define TRADESKILL_MISSING_COMPONENTS	3456	//Sorry, but you don't have everything you need for this recipe in your general inventory.
 #define TRADESKILL_LEARN_RECIPE		3457	//You have learned the recipe %1!
 #define EXPEDITION_MIN_REMAIN		3551	//You only have %1 minutes remaining before this expedition comes to an end.
+#define NO_CAST_ON_PET				4045	//You cannot cast this spell on your pet.
 #define REWIND_WAIT					4059	//You must wait a bit longer before using the rewind command again.
 #define CORPSEDRAG_LIMIT			4061	//You are already dragging as much as you can!
 #define CORPSEDRAG_ALREADY			4062	//You are already dragging %1.
@@ -295,10 +296,14 @@
 #define GUILD_BANK_FULL				6098	// There is no more room in the Guild Bank.
 #define GUILD_BANK_TRANSFERRED		6100	// '%1' transferred to Guild Bank from Deposits.
 #define GUILD_BANK_EMPTY_HANDS		6108	// You must empty your hands to withdraw from the Guild Bank.
+#define TRANSFORM_FAILED			6326	//This mold cannot be applied to your %1.
+#define TRANSFORM_COMPLETE			6327	//You have successfully transformed your %1.
+#define DETRANSFORM_FAILED			6341 	//%1 has no transformation that can be removed.
 #define GENERIC_STRING				6688	//%1 (used to any basic message)
 #define SENTINEL_TRIG_YOU			6724	//You have triggered your sentinel.
 #define SENTINEL_TRIG_OTHER			6725	//%1 has triggered your sentinel.
 #define IDENTIFY_SPELL				6765	//Item Lore: %1.
+#define BUFF_NOT_BLOCKABLE			7608	//You cannot block this effect.
 #define LDON_DONT_KNOW_TRAPPED		7552	//You do not know if this object is trapped.
 #define LDON_HAVE_DISARMED			7553	//You have disarmed %1!
 #define LDON_ACCIDENT_SETOFF		7554	//You accidentally set off the trap!
@@ -338,6 +343,7 @@
 #define STRIKETHROUGH_STRING		9078	//You strike through your opponent's defenses!
 #define SPELL_REFLECT				9082	//%1's spell has been reflected by %2.
 #define NEW_SPELLS_AVAIL			9149	//You have new spells available to you. Check the merchants near your guild master.
+#define SNEAK_RESTRICT				9240	//You can not use this ability because you have not been hidden for long enough.
 #define PET_NOW_FOCUSING			9254	//Focusing on one target, Master.
 #define PET_NOT_FOCUSING			9263	//No longer focusing on one target, Master.
 #define PET_NOT_CASTING				9264	//Not casting spells, Master.

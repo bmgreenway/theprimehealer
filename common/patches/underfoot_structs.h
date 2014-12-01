@@ -519,7 +519,11 @@ struct CastSpell_Struct
 	uint32	spell_id;
 	uint32	inventoryslot;  // slot for clicky item, 0xFFFF = normal cast
 	uint32	target_id;
-	uint32	cs_unknown[5];
+	uint32  cs_unknown1;
+	uint32  cs_unknown2;
+ 	float   y_pos;
+ 	float   x_pos;
+	float   z_pos;
 };
 
 /*
@@ -619,8 +623,8 @@ struct GMTrainee_Struct
 {
 	/*000*/ uint32 npcid;
 	/*004*/ uint32 playerid;
-	/*008*/ uint32 skills[73];
-	/*300*/ uint8 unknown300[148];
+	/*008*/ uint32 skills[PACKET_SKILL_ARRAY_SIZE];
+	/*408*/ uint8 unknown408[40];
 	/*448*/
 };
 
@@ -835,7 +839,7 @@ struct BindStruct {
 static const uint32 MAX_PP_LANGUAGE		= 25; //
 static const uint32 MAX_PP_SPELLBOOK	= 720; // Confirmed 60 pages on Underfoot now
 static const uint32 MAX_PP_MEMSPELL		= 10; //was 9 now 10 on Underfoot
-static const uint32 MAX_PP_SKILL		= _SkillPacketArraySize;	// 100 - actual skills buffer size
+static const uint32 MAX_PP_SKILL		= PACKET_SKILL_ARRAY_SIZE;	// 100 - actual skills buffer size
 static const uint32 MAX_PP_AA_ARRAY		= 300; //was 299
 static const uint32 MAX_GROUP_MEMBERS	= 6;
 static const uint32 MAX_RECAST_TYPES	= 20;
@@ -4001,25 +4005,42 @@ struct ItemVerifyReply_Struct {
 
 struct ItemSerializationHeader
 {
-/*000*/	uint32 stacksize;
-/*004*/	uint32 unknown004;
-/*008*/	uint32 slot;
-/*012*/	uint32 price;
-/*016*/	uint32 merchant_slot; //1 if not a merchant item
-/*020*/	uint32 unknown020; //0
-/*024*/	uint32 instance_id; //unique instance id if not merchant item, else is merchant slot
-/*028*/	uint32 unknown028; //0
-/*032*/	uint32 last_cast_time;	// Unix Time from PP of last cast for this recast type if recast delay > 0
-/*036*/	uint32 charges; //Total Charges an item has (-1 for unlimited)
-/*040*/	uint32 inst_nodrop; // 1 if the item is no drop (attuned items)
-/*044*/	uint32 unknown044; //0
-/*048*/	uint32 unknown048; //0
-/*052*/	uint32 unknown052; //0
-/*056*/	uint32 unknown056; //0
-/*060*/	uint8 unknown060; //0
-/*061*/	uint8 unknown061; //0 - Add Evolving Item struct if this isn't set to 0?
-/*062*/	uint8 unknown062; // New to Underfoot
-/*063*/	uint8 ItemClass; //0, 1, or 2
+	/*000*/	uint32 stacksize;
+	/*004*/	uint32 unknown004;
+	/*008*/	uint32 slot;
+	/*012*/	uint32 price;
+	/*016*/	uint32 merchant_slot; //1 if not a merchant item
+	/*020*/	uint32 scaled_value; //0
+	/*024*/	uint32 instance_id; //unique instance id if not merchant item, else is merchant slot
+	/*028*/	uint32 unknown028; //0
+	/*032*/	uint32 last_cast_time;	// Unix Time from PP of last cast for this recast type if recast delay > 0
+	/*036*/	uint32 charges; //Total Charges an item has (-1 for unlimited)
+	/*040*/	uint32 inst_nodrop; // 1 if the item is no drop (attuned items)
+	/*044*/	uint32 unknown044; //0
+	/*048*/	uint32 unknown048; //0
+	/*052*/	uint32 unknown052; //0
+	/*056*/ uint8 isEvolving; //0 // If 1 Add evolving item data in between Header and HeaderFinish
+};
+
+struct EvolvingItem {
+	uint8 unknown001;
+	uint8 unknown002;
+	uint8 unknown003;
+	uint8 unknown004;
+	int32 evoLevel;
+	double progress;
+	uint8 Activated;
+	int32 evomaxlevel;
+	uint8 unknown02[4];
+};
+
+struct ItemSerializationHeaderFinish
+{
+	uint16 ornamentIcon;
+	/*060*/	uint8 unknown060; //0
+	/*061*/	uint8 unknown061; //0 - 
+	/*062*/	uint8 isCopied; // New to Underfoot // Copied flag on item
+	/*063*/	uint8 ItemClass; //0, 1, or 2
 };
 
 struct ItemBodyStruct
@@ -4251,9 +4272,9 @@ struct ItemQuaternaryBodyStruct
 struct AugmentInfo_Struct
 {
 /*000*/ uint32	itemid;			// id of the solvent needed
-/*004*/ uint8	window;			// window to display the information in
-/*005*/ uint8	unknown005[71];	// total packet length 76, all the rest were always 00
-/*076*/
+/*004*/ uint32	window;			// window to display the information in
+/*008*/ char	augment_info[64];	// total packet length 76, all the rest were always 00
+/*072*/ uint32	unknown072;
 };
 
 struct VeteranRewardItem

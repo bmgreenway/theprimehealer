@@ -199,14 +199,14 @@ bool SharedDatabase::UpdateInventorySlot(uint32 char_id, const ItemInst* inst, i
 	// Update/Insert item
     std::string query = StringFormat("REPLACE INTO inventory "
                                     "(charid, slotid, itemid, charges, instnodrop, custom_data, color, "
-                                    "augslot1, augslot2, augslot3, augslot4, augslot5) "
+                                    "augslot1, augslot2, augslot3, augslot4, augslot5, ornamenticon, ornamentidfile) "
                                     "VALUES( %lu, %lu, %lu, %lu, %lu, '%s', %lu, "
-                                    "%lu, %lu, %lu, %lu, %lu)",
+                                    "%lu, %lu, %lu, %lu, %lu, %lu, %lu)",
                                     (unsigned long)char_id, (unsigned long)slot_id, (unsigned long)inst->GetItem()->ID,
                                     (unsigned long)charges, (unsigned long)(inst->IsInstNoDrop()? 1: 0),
                                     inst->GetCustomDataString().c_str(), (unsigned long)inst->GetColor(),
                                     (unsigned long)augslot[0], (unsigned long)augslot[1], (unsigned long)augslot[2],
-                                    (unsigned long)augslot[3],(unsigned long)augslot[4]);
+                                    (unsigned long)augslot[3],(unsigned long)augslot[4], (unsigned long)inst->GetOrnamentationIcon(), (unsigned long)inst->GetOrnamentationIDFile());
 	auto results = QueryDatabase(query);
 
     // Save bag contents, if slot supports bag contents
@@ -488,7 +488,7 @@ bool SharedDatabase::GetSharedBank(uint32 id, Inventory* inv, bool is_charid) {
 bool SharedDatabase::GetInventory(uint32 char_id, Inventory* inv) {
 	// Retrieve character inventory
 	std::string query = StringFormat("SELECT slotid, itemid, charges, color, augslot1, "
-                                    "augslot2, augslot3, augslot4, augslot5, instnodrop, custom_data "
+                                    "augslot2, augslot3, augslot4, augslot5, instnodrop, custom_data, ornamenticon, ornamentidfile "
                                     "FROM inventory WHERE charid = %i ORDER BY slotid", char_id);
     auto results = QueryDatabase(query);
     if (!results.Success()) {
@@ -512,6 +512,9 @@ bool SharedDatabase::GetInventory(uint32 char_id, Inventory* inv) {
         aug[4]	= (uint32)atoul(row[8]);
 
         bool instnodrop	= (row[9] && (uint16)atoi(row[9]))? true: false;
+
+		uint32 ornament_icon = (uint32)atoul(row[11]);
+		uint32 ornament_idfile = (uint32)atoul(row[12]);
 
         const Item_Struct* item = GetItem(item_id);
 
@@ -549,6 +552,11 @@ bool SharedDatabase::GetInventory(uint32 char_id, Inventory* inv) {
                     value.push_back(v);
             }
         }
+		if (ornament_icon > 0)
+			inst->SetOrnamentIcon(ornament_icon);
+
+		if (ornament_idfile > 0)
+			inst->SetOrnamentationIDFile(ornament_idfile);
 
         if (instnodrop || (((slot_id >= EmuConstants::EQUIPMENT_BEGIN && slot_id <= EmuConstants::EQUIPMENT_END) || slot_id == MainPowerSource) && inst->GetItem()->Attuneable))
             inst->SetInstNoDrop(true);
@@ -591,7 +599,7 @@ bool SharedDatabase::GetInventory(uint32 char_id, Inventory* inv) {
 bool SharedDatabase::GetInventory(uint32 account_id, char* name, Inventory* inv) {
 	// Retrieve character inventory
 	std::string query = StringFormat("SELECT slotid, itemid, charges, color, augslot1, "
-                                    "augslot2, augslot3, augslot4, augslot5, instnodrop, custom_data "
+                                    "augslot2, augslot3, augslot4, augslot5, instnodrop, custom_data, ornamenticon, ornamentidfile  "
                                     "FROM inventory INNER JOIN character_data ch "
                                     "ON ch.id = charid WHERE ch.name = '%s' AND ch.account_id = %i ORDER BY slotid",
                                     name, account_id);
@@ -617,6 +625,9 @@ bool SharedDatabase::GetInventory(uint32 account_id, char* name, Inventory* inv)
         aug[4]	= (uint32)atoi(row[8]);
 
         bool instnodrop	= (row[9] && (uint16)atoi(row[9])) ? true : false;
+		uint32 ornament_icon = (uint32)atoul(row[11]);
+		uint32 ornament_idfile = (uint32)atoul(row[12]);
+		
         const Item_Struct* item = GetItem(item_id);
         int16 put_slot_id = INVALID_INDEX;
         if(!item)
@@ -651,6 +662,12 @@ bool SharedDatabase::GetInventory(uint32 account_id, char* name, Inventory* inv)
 
             }
         }
+		
+		if (ornament_icon > 0)
+			inst->SetOrnamentIcon(ornament_icon);
+
+		if (ornament_idfile > 0)
+			inst->SetOrnamentationIDFile(ornament_idfile);
 
         if (color > 0)
             inst->SetColor(color);
@@ -950,6 +967,7 @@ void SharedDatabase::LoadItems(void *data, uint32 size, int32 items, uint32 max_
         item.QuestItemFlag = (atoi(row[ItemField::questitemflag])==0) ? false : true;
         item.SVCorruption = (int32)atoi(row[ItemField::svcorruption]);
         item.Purity = (uint32)atoul(row[ItemField::purity]);
+        item.EvolvingLevel = (uint8)atoul(row[ItemField::evolvinglevel]);
         item.BackstabDmg = (uint32)atoul(row[ItemField::backstabdmg]);
         item.DSMitigation = (uint32)atoul(row[ItemField::dsmitigation]);
         item.HeroicStr = (int32)atoi(row[ItemField::heroic_str]);
@@ -1214,11 +1232,11 @@ ItemInst* SharedDatabase::CreateBaseItem(const Item_Struct* item, int16 charges)
 }
 
 int32 SharedDatabase::DeleteStalePlayerCorpses() {
-	if(RuleB(Zone, EnableShadowrest))
-	{
-        std::string query = StringFormat("UPDATE player_corpses SET IsBurried = 1 WHERE IsBurried = 0 AND "
-                                        "(UNIX_TIMESTAMP() - UNIX_TIMESTAMP(timeofdeath)) > %d AND NOT timeofdeath = 0",
-                                        (RuleI(Character, CorpseDecayTimeMS) / 1000));
+	if(RuleB(Zone, EnableShadowrest)) {
+        std::string query = StringFormat(
+			"UPDATE `character_corpses` SET `is_buried` = 1 WHERE `is_buried` = 0 AND "
+            "(UNIX_TIMESTAMP() - UNIX_TIMESTAMP(time_of_death)) > %d AND NOT time_of_death = 0",
+             (RuleI(Character, CorpseDecayTimeMS) / 1000));
         auto results = QueryDatabase(query);
 		if (!results.Success())
 			return -1;
@@ -1226,20 +1244,11 @@ int32 SharedDatabase::DeleteStalePlayerCorpses() {
 		return results.RowsAffected();
 	}
 
-    std::string query = StringFormat("DELETE FROM player_corpses WHERE (UNIX_TIMESTAMP() - UNIX_TIMESTAMP(timeofdeath)) > %d "
-                                    "AND NOT timeofdeath = 0", (RuleI(Character, CorpseDecayTimeMS) / 1000));
+    std::string query = StringFormat(
+		"DELETE FROM `character_corpses` WHERE (UNIX_TIMESTAMP() - UNIX_TIMESTAMP(time_of_death)) > %d "
+		"AND NOT time_of_death = 0", (RuleI(Character, CorpseDecayTimeMS) / 1000));
     auto results = QueryDatabase(query);
     if (!results.Success())
-        return -1;
-
-    return results.RowsAffected();
-}
-
-int32 SharedDatabase::DeleteStalePlayerBackups() {
-	// 1209600 seconds = 2 weeks
-	const std::string query = "DELETE FROM player_corpses_backup WHERE (UNIX_TIMESTAMP() - UNIX_TIMESTAMP(timeofdeath)) > 1209600";
-	auto results = QueryDatabase(query);
-	if (!results.Success())
         return -1;
 
     return results.RowsAffected();
@@ -1525,6 +1534,7 @@ void SharedDatabase::LoadSpells(void *data, int max_spells) {
 		sp[tempid].CastingAnim=atoi(row[120]);
 		sp[tempid].SpellAffectIndex=atoi(row[123]);
 		sp[tempid].disallow_sit=atoi(row[124]);
+		sp[tempid].diety_agnostic=atoi(row[125]);
 
 		for (y = 0; y < 16; y++)
 			sp[tempid].deities[y]=atoi(row[126+y]);
@@ -1543,6 +1553,7 @@ void SharedDatabase::LoadSpells(void *data, int max_spells) {
 		sp[tempid].reflectable = atoi(row[161]) != 0;
 		sp[tempid].bonushate=atoi(row[162]);
 
+		sp[tempid].ldon_trap = atoi(row[165]) != 0;
 		sp[tempid].EndurCost=atoi(row[166]);
 		sp[tempid].EndurTimerIndex=atoi(row[167]);
 		sp[tempid].IsDisciplineBuff = atoi(row[168]) != 0;
@@ -1563,9 +1574,11 @@ void SharedDatabase::LoadSpells(void *data, int max_spells) {
 		sp[tempid].NimbusEffect = atoi(row[193]);
 		sp[tempid].directional_start = static_cast<float>(atoi(row[194]));
 		sp[tempid].directional_end = static_cast<float>(atoi(row[195]));
+		sp[tempid].sneak = atoi(row[196]) != 0;
 		sp[tempid].not_extendable = atoi(row[197]) != 0;
 		sp[tempid].suspendable = atoi(row[200]) != 0;
 		sp[tempid].viral_range = atoi(row[201]);
+		sp[tempid].no_block = atoi(row[205]);
 		sp[tempid].spellgroup=atoi(row[207]);
 		sp[tempid].rank = atoi(row[208]);
 		sp[tempid].powerful_flag=atoi(row[209]);
@@ -1910,7 +1923,7 @@ const LootDrop_Struct* SharedDatabase::GetLootDrop(uint32 lootdrop_id) {
 
 void SharedDatabase::LoadCharacterInspectMessage(uint32 character_id, InspectMessage_Struct* message) {
 	std::string query = StringFormat("SELECT `inspect_message` FROM `character_inspect_messages` WHERE `id` = %u LIMIT 1", character_id);
-	auto results = QueryDatabase(query); ThrowDBError(results.ErrorMessage(), "SharedDatabase::LoadCharacterInspectMessage", query);
+	auto results = QueryDatabase(query); 
 	auto row = results.begin();
 	memcpy(message, "", sizeof(InspectMessage_Struct));
 	for (auto row = results.begin(); row != results.end(); ++row) {
@@ -1920,7 +1933,7 @@ void SharedDatabase::LoadCharacterInspectMessage(uint32 character_id, InspectMes
 
 void SharedDatabase::SaveCharacterInspectMessage(uint32 character_id, const InspectMessage_Struct* message) {
 	std::string query = StringFormat("REPLACE INTO `character_inspect_messages` (id, inspect_message) VALUES (%u, '%s')", character_id, EscapeString(message->text).c_str());
-	auto results = QueryDatabase(query); ThrowDBError(results.ErrorMessage(), "SharedDatabase::SaveCharacterInspectMessage", query);
+	auto results = QueryDatabase(query); 
 }
 
 void SharedDatabase::GetBotInspectMessage(uint32 botid, InspectMessage_Struct* message) {

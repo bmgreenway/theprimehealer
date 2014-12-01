@@ -142,14 +142,14 @@ void WorldDatabase::GetCharSelectInfo(uint32 account_id, CharacterSelect_Struct*
 				std::string query = StringFormat("REPLACE INTO `character_bind` (id, zone_id, instance_id, x, y, z, heading, is_home)"
 					" VALUES (%u, %u, %u, %f, %f, %f, %f, %i)",
 					character_id, pp.binds[4].zoneId, 0, pp.binds[4].x, pp.binds[4].y, pp.binds[4].z, pp.binds[4].heading, 1);
-				auto results_bset = QueryDatabase(query); ThrowDBError(results_bset.ErrorMessage(), "WorldDatabase::GetCharSelectInfo Set Home Point", query);
+				auto results_bset = QueryDatabase(query); 
 			}
 			/* If no regular bind set, set it */
 			if (has_bind == 0){
 				std::string query = StringFormat("REPLACE INTO `character_bind` (id, zone_id, instance_id, x, y, z, heading, is_home)"
 					" VALUES (%u, %u, %u, %f, %f, %f, %f, %i)",
 					character_id, pp.binds[0].zoneId, 0, pp.binds[0].x, pp.binds[0].y, pp.binds[0].z, pp.binds[0].heading, 0);
-				auto results_bset = QueryDatabase(query); ThrowDBError(results_bset.ErrorMessage(), "WorldDatabase::GetCharSelectInfo Set Bind Point", query);
+				auto results_bset = QueryDatabase(query); 
 			}
 		}
 		/* Bind End */
@@ -192,7 +192,18 @@ void WorldDatabase::GetCharSelectInfo(uint32 account_id, CharacterSelect_Struct*
 				/* Weapons are handled a bit differently */
 				if ((material == MaterialPrimary) || (material == MaterialSecondary)) {
 					if (strlen(item->GetItem()->IDFile) > 2) {
-						uint32 idfile = atoi(&item->GetItem()->IDFile[2]);
+						int ornamentationAugtype = RuleI(Character, OrnamentationAugmentType);
+						uint32 idfile;
+						if (item->GetOrnamentationAug(ornamentationAugtype)) {
+							idfile = atoi(&item->GetOrnamentationAug(ornamentationAugtype)->GetItem()->IDFile[2]);
+						}
+						else if (item->GetOrnamentationIcon() && item->GetOrnamentationIDFile()) {
+							idfile = item->GetOrnamentationIDFile();
+						}
+						else {
+							idfile = atoi(&item->GetItem()->IDFile[2]);
+						}
+
 						if (material == MaterialPrimary)
 							cs->primary[char_num] = idfile;
 						else
@@ -214,15 +225,37 @@ void WorldDatabase::GetCharSelectInfo(uint32 account_id, CharacterSelect_Struct*
 
 int WorldDatabase::MoveCharacterToBind(int CharID, uint8 bindnum) {
 	/*  if an invalid bind point is specified, use the primary bind */
-	if (bindnum > 4){ bindnum = 0; }
-	int is_home = 0;
-	if (bindnum == 4){ is_home = 1; }
-
-	std::string query = StringFormat("SELECT `zone_id` FROM `character_bind` WHERE `id` = %u AND `is_home` = %u LIMIT 1", CharID, is_home);
-	auto results = database.QueryDatabase(query); int i = 0;
-	for (auto row = results.begin(); row != results.end(); ++row) {
-		return atoi(row[0]);
+	if (bindnum > 4)
+	{
+		bindnum = 0;
 	}
+
+	std::string query = StringFormat("SELECT zone_id, instance_id, x, y, z FROM character_bind WHERE id = %u AND is_home = %u LIMIT 1", CharID, bindnum == 4 ? 1 : 0);
+	auto results = database.QueryDatabase(query);
+	if(!results.Success() || results.RowCount() == 0) {
+		return 0;
+	}
+
+	int zone_id, instance_id;
+	double x, y, z, heading;
+	for (auto row = results.begin(); row != results.end(); ++row) {
+		zone_id = atoi(row[0]);
+		instance_id = atoi(row[1]);
+		x = atof(row[2]);
+		y = atof(row[3]);
+		z = atof(row[4]);
+		heading = atof(row[5]);
+	}
+
+	query = StringFormat("UPDATE character_data SET zone_id = '%d', zone_instance = '%d', x = '%f', y = '%f', z = '%f', heading = '%f' WHERE id = %u", 
+						 zone_id, instance_id, x, y, z, heading, CharID);
+
+	results = database.QueryDatabase(query);
+	if(!results.Success()) {
+		return 0;
+	}
+
+	return zone_id;
 }
 
 bool WorldDatabase::GetStartZone(PlayerProfile_Struct* in_pp, CharCreate_Struct* in_cc)
@@ -231,7 +264,7 @@ bool WorldDatabase::GetStartZone(PlayerProfile_Struct* in_pp, CharCreate_Struct*
 		return false;
 
 	in_pp->x = in_pp->y = in_pp->z = in_pp->heading = in_pp->zone_id = 0;
-	in_pp->binds[0].x = in_pp->binds[0].y = in_pp->binds[0].z = in_pp->binds[0].zoneId = 0;
+	in_pp->binds[0].x = in_pp->binds[0].y = in_pp->binds[0].z = in_pp->binds[0].zoneId = in_pp->binds[0].instance_id = 0;
 
     std::string query = StringFormat("SELECT x, y, z, heading, zone_id, bind_id "
                                     "FROM start_zones WHERE player_choice = % i "
@@ -259,79 +292,79 @@ bool WorldDatabase::GetStartZone(PlayerProfile_Struct* in_pp, CharCreate_Struct*
 			}
 			case 1:
 			{
-				in_pp->zone_id =2;	// qeynos2
+				in_pp->zone_id = 2;	// qeynos2
 				in_pp->binds[0].zoneId = 2;	// qeynos2
 				break;
 			}
 			case 2:
 			{
-				in_pp->zone_id =29;	// halas
+				in_pp->zone_id = 29;	// halas
 				in_pp->binds[0].zoneId = 30;	// everfrost
 				break;
 			}
 			case 3:
 			{
-				in_pp->zone_id =19;	// rivervale
+				in_pp->zone_id = 19;	// rivervale
 				in_pp->binds[0].zoneId = 20;	// kithicor
 				break;
 			}
 			case 4:
 			{
-				in_pp->zone_id =9;	// freportw
+				in_pp->zone_id = 9;	// freportw
 				in_pp->binds[0].zoneId = 9;	// freportw
 				break;
 			}
 			case 5:
 			{
-				in_pp->zone_id =40;	// neriaka
+				in_pp->zone_id = 40;	// neriaka
 				in_pp->binds[0].zoneId = 25;	// nektulos
 				break;
 			}
 			case 6:
 			{
-				in_pp->zone_id =52;	// gukta
+				in_pp->zone_id = 52;	// gukta
 				in_pp->binds[0].zoneId = 46;	// innothule
 				break;
 			}
 			case 7:
 			{
-				in_pp->zone_id =49;	// oggok
+				in_pp->zone_id = 49;	// oggok
 				in_pp->binds[0].zoneId = 47;	// feerrott
 				break;
 			}
 			case 8:
 			{
-				in_pp->zone_id =60;	// kaladima
+				in_pp->zone_id = 60;	// kaladima
 				in_pp->binds[0].zoneId = 68;	// butcher
 				break;
 			}
 			case 9:
 			{
-				in_pp->zone_id =54;	// gfaydark
+				in_pp->zone_id = 54;	// gfaydark
 				in_pp->binds[0].zoneId = 54;	// gfaydark
 				break;
 			}
 			case 10:
 			{
-				in_pp->zone_id =61;	// felwithea
+				in_pp->zone_id = 61;	// felwithea
 				in_pp->binds[0].zoneId = 54;	// gfaydark
 				break;
 			}
 			case 11:
 			{
-				in_pp->zone_id =55;	// akanon
+				in_pp->zone_id = 55;	// akanon
 				in_pp->binds[0].zoneId = 56;	// steamfont
 				break;
 			}
 			case 12:
 			{
-				in_pp->zone_id =82;	// cabwest
+				in_pp->zone_id = 82;	// cabwest
 				in_pp->binds[0].zoneId = 78;	// fieldofbone
 				break;
 			}
 			case 13:
 			{
-				in_pp->zone_id =155;	// sharvahl
+				in_pp->zone_id = 155;	// sharvahl
 				in_pp->binds[0].zoneId = 155;	// sharvahl
 				break;
 			}
@@ -370,7 +403,7 @@ bool WorldDatabase::GetStartZoneSoF(PlayerProfile_Struct* in_pp, CharCreate_Stru
 		return false;
 
 	in_pp->x = in_pp->y = in_pp->z = in_pp->heading = in_pp->zone_id = 0;
-	in_pp->binds[0].x = in_pp->binds[0].y = in_pp->binds[0].z = in_pp->binds[0].zoneId = 0;
+	in_pp->binds[0].x = in_pp->binds[0].y = in_pp->binds[0].z = in_pp->binds[0].zoneId = in_pp->binds[0].instance_id = 0;
 
     std::string query = StringFormat("SELECT x, y, z, heading, bind_id FROM start_zones WHERE zone_id = %i "
                                     "AND player_class = %i AND player_deity = %i AND player_race = %i",
