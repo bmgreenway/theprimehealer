@@ -8,6 +8,7 @@
 #include "sod.h"
 #include "rof.h"
 #include "rof2.h"
+#include "tds.h"
 
 void RegisterAllPatches(EQStreamIdentifier &into) {
 	Titanium::Register(into);
@@ -16,6 +17,7 @@ void RegisterAllPatches(EQStreamIdentifier &into) {
 	UF::Register(into);
 	RoF::Register(into);
 	RoF2::Register(into);
+	TDS::Register(into);
 }
 
 void ReloadAllPatches() {
@@ -25,4 +27,5 @@ void ReloadAllPatches() {
 	UF::Reload();
 	RoF::Reload();
 	RoF2::Reload();
+	TDS::Reload();
 }

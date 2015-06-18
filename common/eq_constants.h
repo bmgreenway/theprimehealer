@@ -884,6 +884,10 @@ enum InventoryMapTypes : int16 {
 	MapGuildTrophyTribute,
 	MapKrono,
 	MapOther,
+	MapMercenaryItems,
+	MapViewMODMercenaryItems,
+	MapMountKeyRingItems,
+	MapViewMODMountKeyRingItems,
 	_MapCount
 };
 
