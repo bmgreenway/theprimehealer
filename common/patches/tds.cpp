@@ -3082,6 +3082,8 @@ namespace TDS
 			eq_cse->Enabled = emu_cse->Enabled;
 			eq_cse->LastLogin = emu_cse->LastLogin;
 			eq_cse->Unknown2 = emu_cse->Unknown2;
+			eq_cse->Unknown281 = 0;
+			eq_cse->Unknown282 = 0;
 
 			emu_ptr += sizeof(CharacterSelectEntry_Struct);
 			eq_ptr += sizeof(structs::CharacterSelectEntry_Struct);

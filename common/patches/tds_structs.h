@@ -166,36 +166,39 @@ struct CharSelectEquip
 struct CharacterSelectEntry_Struct
 {
 /*0000*/	char Name[1];				// Name null terminated
-/*0000*/	uint8 Class;
-/*0000*/	uint32 Race;
-/*0000*/	uint8 Level;
-/*0000*/	uint8 ShroudClass;
-/*0000*/	uint32 ShroudRace;
-/*0000*/	uint16 Zone;
-/*0000*/	uint16 Instance;
-/*0000*/	uint8 Gender;
-/*0000*/	uint8 Face;
-/*0000*/	CharSelectEquip	Equip[9];
-/*0000*/	uint8 Unknown15;			// Seen FF
-/*0000*/	uint8 Unknown19;			// Seen FF
-/*0000*/	uint32 DrakkinTattoo;
-/*0000*/	uint32 DrakkinDetails;
-/*0000*/	uint32 Deity;
-/*0000*/	uint32 PrimaryIDFile;
-/*0000*/	uint32 SecondaryIDFile;
-/*0000*/	uint8 HairColor;
-/*0000*/	uint8 BeardColor;
-/*0000*/	uint8 EyeColor1;
-/*0000*/	uint8 EyeColor2;
-/*0000*/	uint8 HairStyle;
-/*0000*/	uint8 Beard;
-/*0000*/	uint8 GoHome;				// Seen 0 for new char and 1 for existing
-/*0000*/	uint8 Tutorial;				// Seen 1 for new char or 0 for existing
-/*0000*/	uint32 DrakkinHeritage;
-/*0000*/	uint8 Unknown1;				// Seen 0
-/*0000*/	uint8 Enabled;				// Swapped position with 'GoHome' 02/23/2015
-/*0000*/	uint32 LastLogin;
-/*0000*/	uint8 Unknown2;				// Seen 0
+/*0001*/	uint32 Class;				// tds - change from uint8 to uint32
+/*0005*/	uint32 Race;
+/*0009*/	uint8 Level;
+/*0010*/	uint32 ShroudClass;			// tds - change from uint8 to uint32
+/*0014*/	uint32 ShroudRace;
+/*0018*/	uint16 Zone;
+/*0020*/	uint16 Instance;
+/*0022*/	uint8 Gender;
+/*0023*/	uint8 Face;
+/*0024*/	CharSelectEquip	Equip[9];
+/*0240*/	uint8 Unknown15;			// Seen FF
+/*0241*/	uint8 Unknown19;			// Seen FF
+/*0242*/	uint32 DrakkinTattoo;
+/*0246*/	uint32 DrakkinDetails;
+/*0250*/	uint32 Deity;
+/*0254*/	uint32 PrimaryIDFile;
+/*0258*/	uint32 SecondaryIDFile;
+/*0262*/	uint8 HairColor;
+/*0263*/	uint8 BeardColor;
+/*0264*/	uint8 EyeColor1;
+/*0265*/	uint8 EyeColor2;
+/*0266*/	uint8 HairStyle;
+/*0267*/	uint8 Beard;
+/*0268*/	uint8 GoHome;				// Seen 0 for new char and 1 for existing
+/*0269*/	uint8 Tutorial;				// Seen 1 for new char or 0 for existing
+/*0270*/	uint32 DrakkinHeritage;
+/*0274*/	uint8 Unknown1;				// Seen 0
+/*0275*/	uint8 Enabled;				// Swapped position with 'GoHome' 02/23/2015
+/*0276*/	uint32 LastLogin;
+/*0280*/	uint8 Unknown2;				// Seen 0
+/*0281*/	uint8 Unknown281;			// Seen 0 - new to tds
+/*0282*/	uint8 Unknown282;			// Seen 0 - new to tds
+/*0283*/
 };
 
 /*
