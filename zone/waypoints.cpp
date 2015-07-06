@@ -212,7 +212,7 @@ void NPC::UpdateWaypoint(int wp_index)
 	Log.Out(Logs::Detail, Logs::AI, "Next waypoint %d: (%.3f, %.3f, %.3f, %.3f)", wp_index, m_CurrentWayPoint.x, m_CurrentWayPoint.y, m_CurrentWayPoint.z, m_CurrentWayPoint.w);
 
 	//fix up pathing Z
-	if(zone->HasMap() && RuleB(Map, FixPathingZAtWaypoints))
+	if(zone->HasMap() && RuleB(Map, FixPathingZAtWaypoints) && !IsBoat())
 	{
 
 		if(!RuleB(Watermap, CheckForWaterAtWaypoints) || !zone->HasWaterMap() ||
@@ -521,7 +521,7 @@ bool Mob::MakeNewPositionAndSendUpdate(float x, float y, float z, int speed, boo
 	}
 
 	bool send_update = false;
-	int compare_steps = IsBoat() ? 1 : 20;
+	int compare_steps = 20;
 	if(tar_ndx < compare_steps && m_TargetLocation.x==x && m_TargetLocation.y==y) {
 
 		float new_x = m_Position.x + m_TargetV.x*tar_vector;
@@ -597,7 +597,7 @@ bool Mob::MakeNewPositionAndSendUpdate(float x, float y, float z, int speed, boo
 	pRunAnimSpeed = speed;
 	if(IsClient())
 	{
-		animation = speed;
+		animation = speed / 2;
 	}
 	//pRunAnimSpeed = (int8)(speed*NPC_RUNANIM_RATIO);
 	//speed *= NPC_SPEED_MULTIPLIER;
@@ -611,7 +611,7 @@ bool Mob::MakeNewPositionAndSendUpdate(float x, float y, float z, int speed, boo
 	tar_vector = (float)speed / mag;
 
 // mob move fix
-	int numsteps = (int) ( mag * 16.0f / (float)speed);
+	int numsteps = (int) ( mag * 16.0f / (float)speed + 0.5f);
 
 
 // mob move fix
@@ -621,9 +621,9 @@ bool Mob::MakeNewPositionAndSendUpdate(float x, float y, float z, int speed, boo
 		if (numsteps>1)
 		{
 			tar_vector=1.0f	;
-			m_TargetV.x = 1.25f * m_TargetV.x/(float)numsteps;
-			m_TargetV.y = 1.25f * m_TargetV.y/(float)numsteps;
-			m_TargetV.z = 1.25f *m_TargetV.z/(float)numsteps;
+			m_TargetV.x = m_TargetV.x/(float)numsteps;
+			m_TargetV.y = m_TargetV.y/(float)numsteps;
+			m_TargetV.z = m_TargetV.z/(float)numsteps;
 
 			float new_x = m_Position.x + m_TargetV.x;
 			float new_y = m_Position.y + m_TargetV.y;
@@ -636,7 +636,7 @@ bool Mob::MakeNewPositionAndSendUpdate(float x, float y, float z, int speed, boo
 			m_Position.y = new_y;
 			m_Position.z = new_z;
 			m_Position.w = CalculateHeadingToTarget(x, y);
-			tar_ndx = 22 - numsteps;
+			tar_ndx = 20 - numsteps;
 			Log.Out(Logs::Detail, Logs::AI, "Next position2 (%.3f, %.3f, %.3f) (%d steps)", m_Position.x, m_Position.y, m_Position.z, numsteps);
 		}
 		else

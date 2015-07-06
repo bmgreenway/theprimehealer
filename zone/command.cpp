@@ -167,7 +167,6 @@ int command_init(void) {
 		command_add("aggro", "(range) [-v] - Display aggro information for all mobs 'range' distance from your target. -v is verbose faction info.", 80, command_aggro) ||
 		command_add("aggrozone", "[aggro] - Aggro every mob in the zone with X aggro. Default is 0. Not recommend if you're not invulnerable.", 100, command_aggrozone) ||
 		command_add("ai", "[factionid/spellslist/con/guard/roambox/stop/start] - Modify AI on NPC target", 100, command_ai) ||
-		command_add("altactivate",  "[argument] - activates alternate advancement abilities, use altactivate help for more information",  0, command_altactivate) ||
 		command_add("appearance", "[type] [value] - Send an appearance packet for you or your target", 150, command_appearance) ||
 		command_add("attack", "[targetname] - Make your NPC target attack targetname", 150, command_attack) ||
 		command_add("augmentitem",  "Force augments an item. Must have the augment item window open.",  250, command_augmentitem) ||
@@ -219,6 +218,7 @@ int command_init(void) {
 		command_add("flymode", "[0/1/2] - Set your or your player target's flymode to off/on/levitate", 50, command_flymode) ||
 		command_add("fov", "- Check wether you're behind or in your target's field of view", 80, command_fov) ||
 		command_add("freeze", "- Freeze your target", 80, command_freeze) ||
+		command_add("fz", nullptr, 10, command_findzone) ||
 		command_add("gassign", "[id] - Assign targetted NPC to predefined wandering grid id", 100, command_gassign) ||
 		command_add("gender", "[0/1/2] - Change your or your target's gender to male/female/neuter", 50, command_gender) ||
 		command_add("getplayerburriedcorpsecount", "- Get the target's total number of burried player corpses.",  100, command_getplayerburriedcorpsecount) ||
@@ -273,7 +273,6 @@ int command_init(void) {
 		command_add("los", nullptr,0, command_checklos) ||
 		command_add("makepet", "[level] [class] [race] [texture] - Make a pet", 50, command_makepet) ||
 		command_add("mana", "- Fill your or your target's mana", 50, command_mana) ||
-		command_add("manaburn", "- Use AA Wizard class skill manaburn on target", 10, command_manaburn) ||
 		command_add("maxskills", "Maxes skills for you.",  200, command_max_all_skills) ||
 		command_add("memspell", "[slotid] [spellid] - Memorize spellid in the specified slot", 50, command_memspell) ||
 		command_add("merchant_close_shop",  "Closes a merchant shop",  100, command_merchantcloseshop) ||
@@ -322,6 +321,7 @@ int command_init(void) {
 		command_add("raidloot", "LEADER|GROUPLEADER|SELECTED|ALL - Sets your raid loot settings if you have permission to do so.", 0, command_raidloot) ||
 		command_add("randomfeatures", "- Temporarily randomizes the Facial Features of your target", 80, command_randomfeatures) ||
 		command_add("refreshgroup", "- Refreshes Group.",  0, command_refreshgroup) ||
+		command_add("reloadaa", "Reloads AA data", 200, command_reloadaa) ||
 		command_add("reloadallrules", "Executes a reload of all rules.", 80, command_reloadallrules) ||
 		command_add("reloademote", "Reloads NPC Emotes", 80, command_reloademote) ||
 		command_add("reloadlevelmods", nullptr,255, command_reloadlevelmods) ||
@@ -334,8 +334,10 @@ int command_init(void) {
 		command_add("reloadzonepoints", "- Reload zone points from database", 150, command_reloadzps) ||
 		command_add("reloadzps", nullptr,0, command_reloadzps) ||
 		command_add("repop", "[delay] - Repop the zone with optional delay", 100, command_repop) ||
-		command_add("resetaa", "- Resets a Player's AA in their profile and refunds spent AA's to unspent, disconnects player.", 200, command_resetaa) ||
+		command_add("resetaa", "- Resets a Player's AA in their profile and refunds spent AA's to unspent, may disconnect player.", 200, command_resetaa) ||
+		command_add("resetaa_timer", "Command to reset AA cooldown timers.", 200, command_resetaa_timer) ||
 		command_add("revoke", "[charname] [1/0] - Makes charname unable to talk on OOC", 200, command_revoke) ||
+		command_add("rq", nullptr, 150, command_reloadqst) ||
 		command_add("rules", "(subcommand) - Manage server rules",  250, command_rules) ||
 		command_add("save", "- Force your player or player corpse target to be saved to the database", 50, command_save) ||
 		command_add("scribespell",  "[spellid] - Scribe specified spell in your target's spell book.",  180, command_scribespell) ||
@@ -673,8 +675,8 @@ void command_incstat(Client* c, const Seperator* sep){
 	}
 }
 
-void command_resetaa(Client* c,const Seperator *sep){
-	if(c->GetTarget()!=0 && c->GetTarget()->IsClient()){
+void command_resetaa(Client* c,const Seperator *sep) {
+	if(c->GetTarget() && c->GetTarget()->IsClient()){
 		c->GetTarget()->CastToClient()->ResetAA();
 		c->Message(13,"Successfully reset %s's AAs", c->GetTarget()->GetName());
 	}
@@ -1484,7 +1486,7 @@ void command_npcstats(Client *c, const Seperator *sep)
 		c->Message(0, "Current HP: %i  Max HP: %i",  c->GetTarget()->GetHP(), c->GetTarget()->GetMaxHP());
 		//c->Message(0, "Weapon Item Number: %s", c->GetTarget()->GetWeapNo());
 		c->Message(0, "Gender: %i  Size: %f  Bodytype: %d",  c->GetTarget()->GetGender(), c->GetTarget()->GetSize(), c->GetTarget()->GetBodyType());
-		c->Message(0, "Runspeed: %i  Walkspeed: %i",  c->GetTarget()->GetRunspeed(), c->GetTarget()->GetWalkspeed());
+		c->Message(0, "Runspeed: %.3f  Walkspeed: %.3f",  static_cast<float>(0.025f * c->GetTarget()->GetRunspeed()), static_cast<float>(0.025f * c->GetTarget()->GetWalkspeed()));
 		c->Message(0, "Spawn Group: %i  Grid: %i",  c->GetTarget()->CastToNPC()->GetSp2(), c->GetTarget()->CastToNPC()->GetGrid());
 		c->Message(0, "EmoteID: %i",  c->GetTarget()->CastToNPC()->GetEmoteID());
 		c->GetTarget()->CastToNPC()->QueryLoot(c);
@@ -4840,36 +4842,6 @@ void command_zonestatus(Client *c, const Seperator *sep)
 	}
 }
 
-void command_manaburn(Client *c, const Seperator *sep)
-{
-	Mob* target=c->GetTarget();
-
-	if (c->GetTarget() == 0)
-		c->Message(0, "#Manaburn needs a target.");
-	else {
-		int cur_level=c->GetAA(MANA_BURN);//ManaBurn ID
-		if (DistanceSquared(c->GetPosition(), target->GetPosition()) > 200)
-			c->Message(0,"You are too far away from your target.");
-		else {
-			if(cur_level == 1) {
-				if(c->IsAttackAllowed(target))
-				{
-					c->SetMana(0);
-					int nukedmg=(c->GetMana())*2;
-					if (nukedmg>0)
-					{
-						target->Damage(c, nukedmg, 2751, SkillAbjuration/*hackish*/);
-						c->Message(4,"You unleash an enormous blast of magical energies.");
-					}
-					Log.Out(Logs::General, Logs::Normal, "Manaburn request from %s, damage: %d",  c->GetName(), nukedmg);
-				}
-			}
-			else
-				c->Message(0, "You have not learned this skill.");
-		}
-	}
-}
-
 void command_doanim(Client *c, const Seperator *sep)
 {
 	if (!sep->IsNumber(1))
@@ -5584,16 +5556,23 @@ void command_setaapts(Client *c, const Seperator *sep)
 
 	if(sep->arg[1][0] == '\0' || sep->arg[2][0] == '\0')
 		c->Message(0, "Usage: #setaapts <AA|group|raid> <new AA points value>");
-	else if(atoi(sep->arg[2]) <= 0 || atoi(sep->arg[2]) > 200)
-		c->Message(0, "You must have a number greater than 0 for points and no more than 200.");
+	else if(atoi(sep->arg[2]) <= 0 || atoi(sep->arg[2]) > 5000)
+		c->Message(0, "You must have a number greater than 0 for points and no more than 5000.");
 	else if(!strcasecmp(sep->arg[1], "group")) {
-		t->SetLeadershipEXP(atoi(sep->arg[2])*GROUP_EXP_PER_POINT, t->GetRaidEXP());
+		t->GetPP().group_leadership_points = atoi(sep->arg[2]);
+		t->GetPP().group_leadership_exp = 0;
+		t->Message(MT_Experience, "Setting Group AA points to %u", t->GetPP().group_leadership_points);
+		t->SendLeadershipEXPUpdate();
 	} else if(!strcasecmp(sep->arg[1], "raid")) {
-		t->SetLeadershipEXP(t->GetGroupEXP(), atoi(sep->arg[2])*RAID_EXP_PER_POINT);
+		t->GetPP().raid_leadership_points = atoi(sep->arg[2]);
+		t->GetPP().raid_leadership_exp = 0;
+		t->Message(MT_Experience, "Setting Raid AA points to %u", t->GetPP().raid_leadership_points);
+		t->SendLeadershipEXPUpdate();
 	} else {
-		t->SetEXP(t->GetEXP(),t->GetMaxAAXP()*atoi(sep->arg[2]),false);
-		t->SendAAStats();
-		t->SendAATable();
+		t->GetPP().aapoints = atoi(sep->arg[2]);
+		t->GetPP().expAA = 0;
+		t->Message(MT_Experience, "Setting personal AA points to %u", t->GetPP().aapoints);
+		t->SendAlternateAdvancementStats();
 	}
 }
 
@@ -7674,56 +7653,6 @@ void command_reloadtitles(Client *c, const Seperator *sep)
 	safe_delete(pack);
 	c->Message(15, "Player Titles Reloaded.");
 
-}
-
-void command_altactivate(Client *c, const Seperator *sep){
-	if(sep->arg[1][0] == '\0'){
-		c->Message(10, "Invalid argument, usage:");
-		c->Message(10, "#altactivate list - lists the AA ID numbers that are available to you");
-		c->Message(10, "#altactivate time [argument] - returns the time left until you can use the AA with the ID that matches the argument.");
-		c->Message(10, "#altactivate [argument] - activates the AA with the ID that matches the argument.");
-		return;
-	}
-	if(!strcasecmp(sep->arg[1], "help")){
-		c->Message(10, "Usage:");
-		c->Message(10, "#altactivate list - lists the AA ID numbers that are available to you");
-		c->Message(10, "#altactivate time [argument] - returns the time left until you can use the AA with the ID that matches the argument.");
-		c->Message(10, "#altactivate [argument] - activates the AA with the ID that matches the argument.");
-		return;
-	}
-	if(!strcasecmp(sep->arg[1], "list")){
-		c->Message(10, "You have access to the following AA Abilities:");
-		int x, val;
-		SendAA_Struct* saa = nullptr;
-		for(x = 0; x < aaHighestID; x++){
-			if(AA_Actions[x][0].spell_id || AA_Actions[x][0].action){ //if there's an action or spell associated we assume it's a valid
-				val = 0;					//and assume if they don't have a value for the first rank then it isn't valid for any rank
-				saa = nullptr;
-				val = c->GetAA(x);
-				if(val){
-					saa = zone->FindAA(x);
-					c->Message(10, "%d: %s %d",  x, saa->name, val);
-				}
-			}
-		}
-	}
-	else if(!strcasecmp(sep->arg[1], "time")){
-		int ability = atoi(sep->arg[2]);
-		if(c->GetAA(ability)){
-			int remain = c->GetPTimers().GetRemainingTime(pTimerAAStart + ability);
-			if(remain)
-				c->Message(10, "You may use that ability in %d minutes and %d seconds.",  (remain/60), (remain%60));
-			else
-				c->Message(10, "You may use that ability now.");
-		}
-		else{
-			c->Message(10, "You do not have access to that ability.");
-		}
-	}
-	else
-	{
-		c->ActivateAA((aaID) atoi(sep->arg[1]));
-	}
 }
 
 void command_traindisc(Client *c, const Seperator *sep)
@@ -10654,4 +10583,36 @@ void command_mysqltest(Client *c, const Seperator *sep)
 		} 
 	}
 	Log.Out(Logs::General, Logs::Debug, "MySQL Test... Took %f seconds", ((float)(std::clock() - t)) / CLOCKS_PER_SEC); 
+}
+
+void command_resetaa_timer(Client *c, const Seperator *sep) {
+	Client *target = nullptr;
+	if(!c->GetTarget() || !c->GetTarget()->IsClient()) {
+		target = c;
+	} else {
+		target = c->GetTarget()->CastToClient();
+	}
+
+	if(sep->IsNumber(1)) 
+	{
+		int timer_id = atoi(sep->arg[1]);
+		c->Message(0, "Reset of timer %i for %s", timer_id, c->GetName());
+		c->ResetAlternateAdvancementTimer(timer_id);
+	}
+	else if(!strcasecmp(sep->arg[1], "all")) 
+	{
+		c->Message(0, "Reset all timers for %s", c->GetName());
+		c->ResetAlternateAdvancementTimers();
+	} 
+	else 
+	{
+		c->Message(0, "usage: #resetaa_timer [all | timer_id]");
+	}
+}
+
+void command_reloadaa(Client *c, const Seperator *sep) {
+	c->Message(0, "Reloading Alternate Advancement Data...");
+	zone->LoadAlternateAdvancement();
+	c->Message(0, "Alternate Advancement Data Reloaded");
+	entity_list.SendAlternateAdvancementStats();
 }
