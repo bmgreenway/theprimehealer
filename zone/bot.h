@@ -450,7 +450,6 @@ public:
 	int GetRawACNoShield(int &shield_ac);
 	bool GetHasBeenSummoned() { return _hasBeenSummoned; }
 	const glm::vec3 GetPreSummonLocation() const { return m_PreSummonLocation; }
-	bool GetGroupMessagesOn() { return _groupMessagesOn; }
 	bool GetInHealRotation() { return _isInHealRotation; }
 	bool GetHealRotationActive() { return (GetInHealRotation() && _isHealRotationActive); }
 	bool GetHealRotationUseFastHeals() { return _healRotationUseFastHeals; }
@@ -536,7 +535,6 @@ public:
 	void SetDisciplineRecastTimer(int timer_index, int32 recast_delay);
 	void SetHasBeenSummoned(bool s);
 	void SetPreSummonLocation(const glm::vec3& location) { m_PreSummonLocation = location; }
-	void SetGroupMessagesOn(bool groupMessagesOn) { _groupMessagesOn = groupMessagesOn; }
 	void SetInHealRotation( bool inRotation ) { _isInHealRotation = inRotation; }
 	void SetHealRotationActive( bool isActive ) { _isHealRotationActive = isActive; }
 	void SetHealRotationUseFastHeals( bool useFastHeals ) { _healRotationUseFastHeals = useFastHeals; }
@@ -549,6 +547,8 @@ public:
 	void SetNumHealRotationMembers( uint8 numMembers ) { _numHealRotationMembers = numMembers; }
 	void SetBardUseOutOfCombatSongs(bool useOutOfCombatSongs) { _bardUseOutOfCombatSongs = useOutOfCombatSongs;}
 	void SetShowHelm(bool showhelm) { _showhelm = showhelm; }
+	
+	std::string CreateSayLink(Client* botOwner, const char* message, const char* name);
 
 	// Class Destructors
 	virtual ~Bot();
@@ -605,7 +605,6 @@ private:
 	bool _hasBeenSummoned;
 	glm::vec3 m_PreSummonLocation;
 	uint8 _spellCastingChances[MaxStances][MaxSpellTypes];
-	bool _groupMessagesOn;
 	bool _isInHealRotation;
 	bool _isHealRotationActive;
 	bool _healRotationUseFastHeals;
