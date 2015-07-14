@@ -105,7 +105,7 @@ static const uint32 MAX_NUMBER_GUILDS = 1500;
 
 // Used primarily in the Player Profile:
 static const uint32 MAX_PP_LANGUAGE		= 32;	// was 25
-static const uint32 MAX_PP_SPELLBOOK	= 720;	// was 480
+static const uint32 MAX_PP_SPELLBOOK	= 800;	// was 720	// was 480
 static const uint32 MAX_PP_MEMSPELL		= 16;	// was 12
 static const uint32 MAX_PP_SKILL		= PACKET_SKILL_ARRAY_SIZE;	// 100 - actual skills buffer size
 static const uint32 MAX_PP_AA_ARRAY		= 300;
@@ -1044,7 +1044,7 @@ struct PlayerProfile_Struct
 /*00012*/ uint32 unknown_rof2;			//
 /*00016*/ uint8  gender;				// Player Gender - 0 Male, 1 Female
 /*00017*/ uint32  race;					// Player race
-/*00021*/ uint8  class_;				// Player class
+/*00021*/ uint32  class_;				// Player class
 /*00022*/ uint8   level;				// Level of player
 /*00023*/ uint8   level1;				// Level of player (again?)
 /*00024*/ uint32 bind_count;	// Seen 5

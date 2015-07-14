@@ -2052,27 +2052,28 @@ namespace TDS
 		PlayerProfile_Struct *emu = (PlayerProfile_Struct *)__emu_buffer;
 
 		uint32 PacketSize = 40000;	// Calculate this later
+		uint32 FieldEnum = 0;
 
 		EQApplicationPacket *outapp = new EQApplicationPacket(OP_PlayerProfile, PacketSize);
 
+		// *section 1
 		outapp->WriteUInt32(0);		// Checksum, we will update this later
 		outapp->WriteUInt32(0);		// Checksum size, we will update this later
 
+		// *section 2
 		outapp->WriteUInt32(0);		// Unknown
 		outapp->WriteUInt32(0);		// Unknown
-
 
 		outapp->WriteUInt8(emu->gender);	// Gender
 		outapp->WriteUInt32(emu->race);		// Race
-		outapp->WriteUInt8(emu->class_);	// Class
+		outapp->WriteUInt32(emu->class_);	// Class
 		outapp->WriteUInt8(emu->level);		// Level
-		outapp->WriteUInt8(emu->level);		// Level1
+		outapp->WriteUInt8(emu->level);		// HighestLevel
 
-
-		outapp->WriteUInt32(5);			// Bind count
-
-		for (int r = 0; r < 5; r++)
-		{
+		// *section 3
+		FieldEnum = 5;
+		outapp->WriteUInt32(FieldEnum);			// Bind count
+		for (int r = 0; r < FieldEnum; r++) {
 			outapp->WriteUInt32(emu->binds[r].zoneId);
 			outapp->WriteFloat(emu->binds[r].x);
 			outapp->WriteFloat(emu->binds[r].y);
@@ -2080,31 +2081,29 @@ namespace TDS
 			outapp->WriteFloat(emu->binds[r].heading);
 		}
 
+		// *section 4
 		outapp->WriteUInt32(emu->deity);
 		outapp->WriteUInt32(emu->intoxication);
 
-		outapp->WriteUInt32(10);		// Unknown count
-
-		for (int r = 0; r < 10; r++)
-		{
+		// *section 5
+		FieldEnum = 10;
+		outapp->WriteUInt32(FieldEnum);		// Unknown count
+		for (int r = 0; r < FieldEnum; r++) {
 			outapp->WriteUInt32(0);		// Unknown
 		}
 
-		outapp->WriteUInt32(22);		// Equipment count
-
-		for (int r = 0; r < 9; r++)
-		{
+		// *section 6 (don't believe these assignments are correct)
+		FieldEnum = 22;
+		outapp->WriteUInt32(FieldEnum);		// Equipment count
+		for (int r = 0; r < 9; r++) {
 			outapp->WriteUInt32(emu->item_material[r]);
 			outapp->WriteUInt32(0);
 			outapp->WriteUInt32(0);
 			outapp->WriteUInt32(0);
 			outapp->WriteUInt32(0);
 		}
-
 		// Write zeroes for the next 13 equipment slots
-
-		for (int r = 0; r < 13; r++)
-		{
+		for (int r = 9; r < FieldEnum; r++) {
 			outapp->WriteUInt32(0);
 			outapp->WriteUInt32(0);
 			outapp->WriteUInt32(0);
@@ -2112,10 +2111,10 @@ namespace TDS
 			outapp->WriteUInt32(0);
 		}
 
-		outapp->WriteUInt32(9);		// Equipment2 count
-
-		for (int r = 0; r < 9; r++)
-		{
+		// *section 7
+		FieldEnum = 9;
+		outapp->WriteUInt32(FieldEnum);		// Equipment2 count
+		for (int r = 0; r < FieldEnum; r++) {
 			outapp->WriteUInt32(0);
 			outapp->WriteUInt32(0);
 			outapp->WriteUInt32(0);
@@ -2123,26 +2122,27 @@ namespace TDS
 			outapp->WriteUInt32(0);
 		}
 
-		outapp->WriteUInt32(9);		// Tint Count
-
-		for (int r = 0; r < 7; r++)
-		{
+		// *section 8
+		FieldEnum = 9;
+		outapp->WriteUInt32(FieldEnum);		// Tint Count
+		for (int r = 0; r < FieldEnum; r++) {
 			outapp->WriteUInt32(emu->item_tint[r].Color);
 		}
-		// Write zeroes for extra two tint values
-		outapp->WriteUInt32(0);
-		outapp->WriteUInt32(0);
+		// Write zeroes for extra two tint values (< 7)
+		//outapp->WriteUInt32(0);
+		//outapp->WriteUInt32(0);
 
-		outapp->WriteUInt32(9);		// Tint2 Count
-
-		for (int r = 0; r < 7; r++)
-		{
+		// *section 9
+		FieldEnum = 9;
+		outapp->WriteUInt32(FieldEnum);		// Tint2 Count
+		for (int r = 0; r < FieldEnum; r++) {
 			outapp->WriteUInt32(emu->item_tint[r].Color);
 		}
-		// Write zeroes for extra two tint values
-		outapp->WriteUInt32(0);
-		outapp->WriteUInt32(0);
+		// Write zeroes for extra two tint values (< 7)
+		//outapp->WriteUInt32(0);
+		//outapp->WriteUInt32(0);
 
+		// section 10
 		outapp->WriteUInt8(emu->haircolor);
 		outapp->WriteUInt8(emu->beardcolor);
 		outapp->WriteUInt32(0);			// Unknown
@@ -2151,33 +2151,23 @@ namespace TDS
 		outapp->WriteUInt8(emu->hairstyle);
 		outapp->WriteUInt8(emu->beard);
 		outapp->WriteUInt8(emu->face);
-
-		// Think there should be an extra byte before the drakkin stuff (referred to as oldface in client)
-		// Then one of the five bytes following the drakkin stuff needs removing.
-
+		outapp->WriteUInt8(0);			// oldface
 		outapp->WriteUInt32(emu->drakkin_heritage);
 		outapp->WriteUInt32(emu->drakkin_tattoo);
 		outapp->WriteUInt32(emu->drakkin_details);
-
-		outapp->WriteUInt8(0);			// Unknown 0
 		outapp->WriteUInt8(0xff);		// Unknown 0xff
 		outapp->WriteUInt8(1);			// Unknown 1
 		outapp->WriteUInt8(0xff);		// Unknown 0xff
 		outapp->WriteUInt8(1);			// Unknown 1
-
 		outapp->WriteFloat(5.0f);		// Height
-
 		outapp->WriteFloat(3.0f);		// Unknown 3.0
 		outapp->WriteFloat(2.5f);		// Unknown 2.5
 		outapp->WriteFloat(5.5f);		// Unknown 5.5
-
 		outapp->WriteUInt32(0);			// Primary ?
 		outapp->WriteUInt32(0);			// Secondary ?
-
 		outapp->WriteUInt32(emu->points);	// Unspent skill points
 		outapp->WriteUInt32(emu->mana);
 		outapp->WriteUInt32(emu->cur_hp);
-
 		outapp->WriteUInt32(emu->STR);
 		outapp->WriteUInt32(emu->STA);
 		outapp->WriteUInt32(emu->CHA);
@@ -2185,130 +2175,122 @@ namespace TDS
 		outapp->WriteUInt32(emu->INT);
 		outapp->WriteUInt32(emu->AGI);
 		outapp->WriteUInt32(emu->WIS);
+		outapp->WriteUInt32(0);			// Unknown (hSTR?)
+		outapp->WriteUInt32(0);			// Unknown (hSTA?)
+		outapp->WriteUInt32(0);			// Unknown (hCHA?)
+		outapp->WriteUInt32(0);			// Unknown (hDEX?)
+		outapp->WriteUInt32(0);			// Unknown (hINT?)
+		outapp->WriteUInt32(0);			// Unknown (hAGI?)
+		outapp->WriteUInt32(0);			// Unknown (hWIS?)
 
-		outapp->WriteUInt32(0);			// Unknown
-		outapp->WriteUInt32(0);			// Unknown
-		outapp->WriteUInt32(0);			// Unknown
-		outapp->WriteUInt32(0);			// Unknown
-		outapp->WriteUInt32(0);			// Unknown
-		outapp->WriteUInt32(0);			// Unknown
-		outapp->WriteUInt32(0);			// Unknown
-
-		outapp->WriteUInt32(300);		// AA Count
-
-		for (uint32 r = 0; r < MAX_PP_AA_ARRAY; r++)
-		{
+		// *section 11
+		FieldEnum = structs::MAX_PP_AA_ARRAY; // 300
+		outapp->WriteUInt32(FieldEnum);		// AA Count
+		for (uint32 r = 0; r < MAX_PP_AA_ARRAY; r++) {
 			outapp->WriteUInt32(emu->aa_array[r].AA);
 			outapp->WriteUInt32(emu->aa_array[r].value);
 			outapp->WriteUInt32(emu->aa_array[r].charges);
 		}
-
-		// Fill the other 60 AAs with zeroes
-
-		for (uint32 r = 0; r < structs::MAX_PP_AA_ARRAY - MAX_PP_AA_ARRAY; r++)
-		{
+		for (uint32 r = MAX_PP_AA_ARRAY; r < FieldEnum; r++) {
 			outapp->WriteUInt32(0);
 			outapp->WriteUInt32(0);
 			outapp->WriteUInt32(0);
 		}
 
-		outapp->WriteUInt32(structs::MAX_PP_SKILL);
-
-		for (uint32 r = 0; r < structs::MAX_PP_SKILL; r++)
-		{
+		// *section 12
+		FieldEnum = structs::MAX_PP_SKILL; // 100
+		outapp->WriteUInt32(FieldEnum);
+		for (uint32 r = 0; r < MAX_PP_SKILL; r++) {
 			outapp->WriteUInt32(emu->skills[r]);
 		}
+		for (uint32 r = MAX_PP_SKILL; r < FieldEnum; r++) {
+			outapp->WriteUInt32(0);
+		}
 
-		outapp->WriteUInt32(25);			// Unknown count
-
-		for (uint32 r = 0; r < 25; r++)
-		{
+		// *section 13
+		FieldEnum = 25;
+		outapp->WriteUInt32(FieldEnum);			// Unknown count
+		for (uint32 r = 0; r < FieldEnum; r++) {
 			outapp->WriteUInt32(0);			// Unknown
 		}
 
+		// *section 14
+		FieldEnum = structs::MAX_PP_DISCIPLINES; // 300
 		outapp->WriteUInt32(structs::MAX_PP_DISCIPLINES);	// Discipline count
-
-		for (uint32 r = 0; r < MAX_PP_DISCIPLINES; r++)
-		{
+		for (uint32 r = 0; r < MAX_PP_DISCIPLINES; r++) {
 			outapp->WriteUInt32(emu->disciplines.values[r]);
 		}
-
-		// Write zeroes for the rest of the disciplines
-		for (uint32 r = 0; r < structs::MAX_PP_DISCIPLINES - MAX_PP_DISCIPLINES; r++)
-		{
+		for (uint32 r = MAX_PP_DISCIPLINES; r < FieldEnum; r++) {
 			outapp->WriteUInt32(0);
 		}
 
-		outapp->WriteUInt32(20);			// Timestamp count
-
-		for (uint32 r = 0; r < 20; r++)
-		{
+		// *section 15
+		FieldEnum = 20;
+		outapp->WriteUInt32(FieldEnum);			// Timestamp count
+		for (uint32 r = 0; r < FieldEnum; r++) {
 			outapp->WriteUInt32(0);
 		}
 
+		// *section 16
+		FieldEnum = structs::MAX_RECAST_TYPES; // 20
 		outapp->WriteUInt32(MAX_RECAST_TYPES);			// Timestamp count
-
-		for (uint32 r = 0; r < MAX_RECAST_TYPES; r++)
-		{
+		for (uint32 r = 0; r < MAX_RECAST_TYPES; r++) {
 			outapp->WriteUInt32(emu->recastTimers[r]);
 		}
-
-		outapp->WriteUInt32(100);			// Timestamp2 count
-
-		for (uint32 r = 0; r < 100; r++)
-		{
+		for (uint32 r = MAX_RECAST_TYPES; r < FieldEnum; r++) {
 			outapp->WriteUInt32(0);
 		}
 
-		outapp->WriteUInt32(structs::MAX_PP_SPELLBOOK);		// Spellbook slots
+		// *section 17
+		FieldEnum = 100;
+		outapp->WriteUInt32(FieldEnum);			// Timestamp2 count
+		for (uint32 r = 0; r < 100; r++) {
+			outapp->WriteUInt32(0);
+		}
 
-		for (uint32 r = 0; r < MAX_PP_SPELLBOOK; r++)
-		{
+		// *section 18
+		FieldEnum = structs::MAX_PP_SPELLBOOK; // 800
+		outapp->WriteUInt32(FieldEnum);		// Spellbook slots
+		for (uint32 r = 0; r < MAX_PP_SPELLBOOK; r++) {
 			outapp->WriteUInt32(emu->spell_book[r]);
 		}
-		// zeroes for the rest of the spellbook slots
-		for (uint32 r = 0; r < structs::MAX_PP_SPELLBOOK - MAX_PP_SPELLBOOK; r++)
-		{
+		for (uint32 r = MAX_PP_SPELLBOOK; r < FieldEnum; r++) {
 			outapp->WriteUInt32(0xFFFFFFFFU);
 		}
 
+		// *section 19
+		FieldEnum = structs::MAX_PP_MEMSPELL; // 16
 		outapp->WriteUInt32(structs::MAX_PP_MEMSPELL);		// Memorised spell slots
-
-		for (uint32 r = 0; r < MAX_PP_MEMSPELL; r++)
-		{
+		for (uint32 r = 0; r < MAX_PP_MEMSPELL; r++) {
 			outapp->WriteUInt32(emu->mem_spells[r]);
 		}
-		// zeroes for the rest of the slots
-		for (uint32 r = 0; r < structs::MAX_PP_MEMSPELL - MAX_PP_MEMSPELL; r++)
-		{
+		for (uint32 r = MAX_PP_MEMSPELL; r < FieldEnum; r++) {
 			outapp->WriteUInt32(0xFFFFFFFFU);
 		}
 
-		outapp->WriteUInt32(13);			// Unknown count
-
-		for (uint32 r = 0; r < 13; r++)
-		{
+		// *section 20
+		FieldEnum = 13;
+		outapp->WriteUInt32(FieldEnum);			// Unknown count
+		for (uint32 r = 0; r < FieldEnum; r++) {
 			outapp->WriteUInt32(0);			// Unknown
 		}
 
+		// *section 21
 		outapp->WriteUInt8(0);			// Unknown
 
+		// *section 22
+		FieldEnum = structs::BUFF_COUNT; // 42
 		outapp->WriteUInt32(structs::BUFF_COUNT);
-
-		for (uint32 r = 0; r < BUFF_COUNT; r++)
-		{
+		for (uint32 r = 0; r < BUFF_COUNT; r++) {
 			float instrument_mod = 0.0f;
 			uint8 slotid = emu->buffs[r].slotid;
 			uint32 player_id = emu->buffs[r].player_id;;
-
-			if (emu->buffs[r].spellid != 0xFFFF && emu->buffs[r].spellid != 0)
-			{
+			if (emu->buffs[r].spellid != 0xFFFF && emu->buffs[r].spellid != 0) {
 				instrument_mod = 1.0f + (emu->buffs[r].bard_modifier - 10) / 10.0f;
 				slotid = 2;
 				player_id = 0x000717fd;
 			}
-			else
-			{
+			else {
 				slotid = 0;
 			}
 			outapp->WriteUInt8(0);		// Had this as slot, but always appears to be 0 on live.
@@ -2324,104 +2306,94 @@ namespace TDS
 			outapp->WriteUInt32(0);
 			outapp->WriteUInt8(0);
 			outapp->WriteUInt32(emu->buffs[r].counters);	// Appears twice ?
-
-			for (uint32 j = 0; j < 44; ++j)
+			for (uint32 j = 0; j < 44; ++j) {
 				outapp->WriteUInt8(0);	// Unknown
+			}
 		}
-
-		for (uint32 r = 0; r < structs::BUFF_COUNT - BUFF_COUNT; r++)
-		{
-			// 80 bytes of zeroes
-			for (uint32 j = 0; j < 20; ++j)
+		for (uint32 r = BUFF_COUNT; r < FieldEnum; r++) {
+			for (uint32 j = 0; j < 20; ++j) { // 80 bytes of zeroes
 				outapp->WriteUInt32(0);
+			}
 		}
 
+		// *section 23
 		outapp->WriteUInt32(emu->platinum);
 		outapp->WriteUInt32(emu->gold);
 		outapp->WriteUInt32(emu->silver);
 		outapp->WriteUInt32(emu->copper);
-
 		outapp->WriteUInt32(emu->platinum_cursor);
 		outapp->WriteUInt32(emu->gold_cursor);
 		outapp->WriteUInt32(emu->silver_cursor);
 		outapp->WriteUInt32(emu->copper_cursor);
-
 		outapp->WriteUInt32(0);		// Unknown
-
 		outapp->WriteUInt32(0);		// This is the cooldown timer for the monk 'Mend' skill. Client will add 6 minutes to this value the first time the
 		// player logs in. After that it will honour whatever value we send here.
-
 		outapp->WriteUInt32(0);		// Unknown
-
 		outapp->WriteUInt32(emu->thirst_level);
 		outapp->WriteUInt32(emu->hunger_level);
 
+		// *section 24
 		outapp->WriteUInt32(emu->aapoints_spent);
-
-		outapp->WriteUInt32(5);				// AA Window Tab Count
-		outapp->WriteUInt32(0);				// AA Points assigned ?
-		outapp->WriteUInt32(0);				// AA Points in General ?
-		outapp->WriteUInt32(0);				// AA Points in Class ?
-		outapp->WriteUInt32(0);				// AA Points in Archetype ?
-		outapp->WriteUInt32(0);				// AA Points in Special ?
+		FieldEnum = 6;
+		outapp->WriteUInt32(FieldEnum);
+		for (uint32 r = 0; r < FieldEnum; r++) {
+			outapp->WriteUInt32(0);
+		}
 		outapp->WriteUInt32(emu->aapoints);		// AA Points unspent
 
-		outapp->WriteUInt8(0);				// Unknown
-		outapp->WriteUInt8(0);				// Unknown
+		// *section 25
+		outapp->WriteUInt8(0);				// Hide
+		outapp->WriteUInt8(0);				// Sneak
 
-		outapp->WriteUInt32(consts::BANDOLIERS_SIZE);
-
-		// Copy bandoliers where server and client indexes converge
-		for (uint32 r = 0; r < EmuConstants::BANDOLIERS_SIZE && r < consts::BANDOLIERS_SIZE; ++r) {
+		// *section 26
+		FieldEnum = consts::BANDOLIERS_SIZE; // 20
+		outapp->WriteUInt32(FieldEnum);
+		for (uint32 r = 0; r < EmuConstants::BANDOLIERS_SIZE && r < FieldEnum; ++r) {
 			outapp->WriteString(emu->bandoliers[r].Name);
 			for (uint32 j = 0; j < consts::BANDOLIER_ITEM_COUNT; ++j) { // Will need adjusting if 'server != client' is ever true
 				outapp->WriteString(emu->bandoliers[r].Items[j].Name);
 				outapp->WriteUInt32(emu->bandoliers[r].Items[j].ID);
 				if (emu->bandoliers[r].Items[j].Icon) {
 					outapp->WriteSInt32(emu->bandoliers[r].Items[j].Icon);
- 				}
+				}
 				else {
- 					// If no icon, it must send -1 or Treasure Chest Icon (836) is displayed
- 					outapp->WriteSInt32(-1);
- 				}
- 			}
- 		}
-		// Nullify bandoliers where server and client indexes diverge, with a client bias
-		for (uint32 r = EmuConstants::BANDOLIERS_SIZE; r < consts::BANDOLIERS_SIZE; ++r) {
- 			outapp->WriteString("");
+					outapp->WriteSInt32(-1); // If no icon, it must send -1 or Treasure Chest Icon (836) is displayed
+				}
+			}
+		}
+		for (uint32 r = EmuConstants::BANDOLIERS_SIZE; r < FieldEnum; ++r) {
+			outapp->WriteString("");
 			for (uint32 j = 0; j < consts::BANDOLIER_ITEM_COUNT; ++j) { // Will need adjusting if 'server != client' is ever true
- 				outapp->WriteString("");
- 				outapp->WriteUInt32(0);
- 				outapp->WriteSInt32(-1);
- 			}
- 		}
+				outapp->WriteString("");
+				outapp->WriteUInt32(0);
+				outapp->WriteSInt32(-1);
+			}
+		}
 
-		outapp->WriteUInt32(consts::POTION_BELT_ITEM_COUNT);
-
-		// Copy potion belt where server and client indexes converge
-		for (uint32 r = 0; r < EmuConstants::POTION_BELT_ITEM_COUNT && r < consts::POTION_BELT_ITEM_COUNT; ++r) {
+		// *section 27
+		FieldEnum = consts::POTION_BELT_ITEM_COUNT; // 5
+		outapp->WriteUInt32(FieldEnum);
+		for (uint32 r = 0; r < EmuConstants::POTION_BELT_ITEM_COUNT && r < FieldEnum; ++r) {
 			outapp->WriteString(emu->potionbelt.Items[r].Name);
 			outapp->WriteUInt32(emu->potionbelt.Items[r].ID);
 			if (emu->potionbelt.Items[r].Icon) {
 				outapp->WriteSInt32(emu->potionbelt.Items[r].Icon);
- 			}
+			}
 			else {
-				// If no icon, it must send -1 or Treasure Chest Icon (836) is displayed
- 				outapp->WriteSInt32(-1);
- 			}
- 		}
-		// Nullify potion belt where server and client indexes diverge, with a client bias
-		for (uint32 r = EmuConstants::POTION_BELT_ITEM_COUNT; r < consts::POTION_BELT_ITEM_COUNT; ++r) {
+				outapp->WriteSInt32(-1); // If no icon, it must send -1 or Treasure Chest Icon (836) is displayed
+			}
+		}
+		for (uint32 r = EmuConstants::POTION_BELT_ITEM_COUNT; r < FieldEnum; ++r) {
 			outapp->WriteString("");
 			outapp->WriteUInt32(0);
 			outapp->WriteSInt32(-1);
 		}
 
+		// *section 28
 		outapp->WriteSInt32(-1);	// Unknown;
 		outapp->WriteSInt32(123);	// HP Total ?
 		outapp->WriteSInt32(234);	// Endurance Total ?
 		outapp->WriteSInt32(345);	// Mana Total ?
-
 		outapp->WriteUInt32(0);		// Unknown
 		outapp->WriteUInt32(0);		// Unknown
 		outapp->WriteUInt32(0);		// Unknown
@@ -2434,127 +2406,127 @@ namespace TDS
 		outapp->WriteUInt32(0);		// Unknown
 		outapp->WriteUInt32(0);		// Unknown
 		outapp->WriteUInt32(0);		// Unknown
-
-		outapp->WriteUInt32(20);	// Unknown - Expansion count ?
-
+		outapp->WriteUInt32(22);	// Unknown - Expansion count ? (was 20)
 		outapp->WriteUInt32(0);		// Unknown
 		outapp->WriteUInt32(0);		// Unknown
 		outapp->WriteUInt32(0);		// Unknown
 		outapp->WriteUInt32(0);		// Unknown
 		outapp->WriteUInt32(emu->endurance);
+
+		// *section 29
 		outapp->WriteUInt32(0);		// Unknown - Observed 0x7cde - This is also seen in guild packets sent to this character.
 		outapp->WriteUInt32(0);		// Unknown - Observed 0x64
 
-		outapp->WriteUInt32(64);	// Name Length
-
+		// *section 30
+		FieldEnum = 64;
+		outapp->WriteUInt32(FieldEnum);	// Name Length
 		uint32 CurrentPosition = outapp->GetWritePosition();
-
 		outapp->WriteString(emu->name);
+		outapp->SetWritePosition(CurrentPosition + FieldEnum);
 
-		outapp->SetWritePosition(CurrentPosition + 64);
-
-		outapp->WriteUInt32(32);	// Last Name Length
-
+		// *section 31
+		FieldEnum = 32;
+		outapp->WriteUInt32(FieldEnum);	// Last Name Length
 		CurrentPosition = outapp->GetWritePosition();
-
 		outapp->WriteString(emu->last_name);
+		outapp->SetWritePosition(CurrentPosition + FieldEnum);
 
-		outapp->SetWritePosition(CurrentPosition + 32);
-
+		// *section 32
 		outapp->WriteUInt32(emu->birthday);
 		outapp->WriteUInt32(emu->birthday);		// Account start date ?
 		outapp->WriteUInt32(emu->lastlogin);
 		outapp->WriteUInt32(emu->timePlayedMin);
 		outapp->WriteUInt32(emu->timeentitledonaccount);
 		outapp->WriteUInt32(emu->expansions);
-		//outapp->WriteUInt32(0x0007ffff);		// Expansion bitmask
 
-		outapp->WriteUInt32(structs::MAX_PP_LANGUAGE);
-
-		for (uint32 r = 0; r < MAX_PP_LANGUAGE; r++)
-		{
+		// *section 33
+		FieldEnum = structs::MAX_PP_LANGUAGE; // 32
+		outapp->WriteUInt32(FieldEnum);
+		for (uint32 r = 0; r < MAX_PP_LANGUAGE; r++) {
 			outapp->WriteUInt8(emu->languages[r]);
 		}
-
-		for (uint32 r = 0; r < structs::MAX_PP_LANGUAGE - MAX_PP_LANGUAGE; r++)
-		{
+		for (uint32 r = MAX_PP_LANGUAGE; r < FieldEnum; r++) {
 			outapp->WriteUInt8(0);
 		}
 
+		// *section 34
 		outapp->WriteUInt16(emu->zone_id);
 		outapp->WriteUInt16(emu->zoneInstance);
-
 		outapp->WriteFloat(emu->y);
 		outapp->WriteFloat(emu->x);
 		outapp->WriteFloat(emu->z);
 		outapp->WriteFloat(emu->heading);
-
 		outapp->WriteUInt8(0);				// Unknown
 		outapp->WriteUInt8(emu->pvp);
 		outapp->WriteUInt8(0);				// Unknown
 		outapp->WriteUInt8(emu->gm);
 		outapp->WriteUInt32(emu->guild_id);
-
 		outapp->WriteUInt8(emu->guildrank);	// guildrank
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt8(0);			// Unknown
 		outapp->WriteUInt32(0);				// Unknown
-
 		outapp->WriteUInt64(emu->exp);		// int32 in client
-
 		outapp->WriteUInt8(5);			// Unknown - Seen 5 on Live - Eye Height?
-
 		outapp->WriteUInt32(emu->platinum_bank);
 		outapp->WriteUInt32(emu->gold_bank);
 		outapp->WriteUInt32(emu->silver_bank);
 		outapp->WriteUInt32(emu->copper_bank);
-
 		outapp->WriteUInt32(emu->platinum_shared);
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(0);				// Unknown
 
-		outapp->WriteUInt32(0);				// Unknown
+		// *section 35
+		FieldEnum = 20;
+		outapp->WriteUInt32(FieldEnum);				// Unknown
+		for (uint32 r = 0; r < FieldEnum; r++) {
+			outapp->WriteUInt32(0);
+			outapp->WriteUInt32(0);
+		}
 
+		// *section 36
 		outapp->WriteSInt32(-1);				// Unknown
 		outapp->WriteSInt32(-1);				// Unknown
-
 		outapp->WriteUInt32(emu->career_tribute_points);
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(emu->tribute_points);
 		outapp->WriteUInt32(0);				// Unknown
-
 		outapp->WriteUInt8(0);				// Unknown
 		outapp->WriteUInt8(0);				// Unknown
 
-		outapp->WriteUInt32(EmuConstants::TRIBUTE_SIZE);
-
-		for (uint32 r = 0; r < EmuConstants::TRIBUTE_SIZE; r++)
-		{
+		// *section 37
+		FieldEnum = EmuConstants::TRIBUTE_SIZE; // 5
+		outapp->WriteUInt32(FieldEnum);
+		for (uint32 r = 0; r < EmuConstants::TRIBUTE_SIZE; r++) {
 			outapp->WriteUInt32(emu->tributes[r].tribute);
 			outapp->WriteUInt32(emu->tributes[r].tier);
 		}
 
-		outapp->WriteUInt32(10);		// Guild Tribute Count ?
-
-		for (uint32 r = 0; r < 10; r++)
-		{
+		// *section 38
+		FieldEnum = 10;
+		outapp->WriteUInt32(FieldEnum);		// Guild Tribute Count ?
+		for (uint32 r = 0; r < 10; r++) {
 			outapp->WriteUInt32(0xffffffff);
 			outapp->WriteUInt32(0);
 		}
 
-		outapp->WriteUInt32(0);				// Unknown
-		outapp->WriteUInt32(0);				// Unknown
-		outapp->WriteUInt32(0);				// Unknown
+		// *section 39
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(0);				// Unknown
 
-		for (uint32 r = 0; r < 125; r++)
-		{
-			outapp->WriteUInt8(0);				// Unknown
+		// *section 40
+		outapp->WriteUInt32(0);				// Unknown
+		outapp->WriteUInt8(0);				// Unknown
+		for (uint32 r = 0; r < 114; r++) {
+			outapp->WriteUInt8(0);			// Unknown
+		}
+		outapp->WriteUInt16(16256);
+		for (uint32 r = 116; r < 124; r++) {
+			outapp->WriteUInt8(0);			// Unknown
 		}
 
+		// *section 41 - removed 1 uint32 write from original sequence..did not match up - could have been FieldEnum for section 42
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(emu->currentRadCrystals);
@@ -2563,102 +2535,52 @@ namespace TDS
 		outapp->WriteUInt32(emu->careerEbonCrystals);
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(0);				// Unknown
-		outapp->WriteUInt32(0);				// Unknown
 
-		// Unknown String ?
-		outapp->WriteUInt32(64);			// Unknown
-		for (uint32 r = 0; r < 64; r++)
-		{
+		// *section 42
+		FieldEnum = 64;
+		outapp->WriteUInt32(FieldEnum);			// Unknown
+		for (uint32 r = 0; r < FieldEnum; r++) {
 			outapp->WriteUInt8(0);				// Unknown
 		}
 
+		// *section 43
 		outapp->WriteUInt8(0);				// Unknown
 		outapp->WriteUInt8(0);				// Unknown
 		outapp->WriteUInt8(0);				// Unknown
-
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(0);				// Unknown
-
 		outapp->WriteUInt8(0);				// Unknown
 		outapp->WriteUInt8(0);				// Unknown
 		outapp->WriteUInt8(0);				// Unknown
-
+		outapp->WriteUInt32(0);				// Unknown
+		outapp->WriteUInt8(0);				// Unknown
+		outapp->WriteUInt8(0);				// Unknown
+		outapp->WriteUInt8(0);				// Unknown
+		outapp->WriteUInt32(0);				// Unknown
+		outapp->WriteUInt8(0);				// Unknown
 		outapp->WriteUInt32(0);				// Unknown
 
-		outapp->WriteUInt8(0);				// Unknown
-		outapp->WriteUInt8(0);				// Unknown
-		outapp->WriteUInt8(0);				// Unknown
-
-		outapp->WriteUInt32(0);				// Unknown
-
-		outapp->WriteUInt8(0);				// Unknown
-
-		outapp->WriteUInt32(0);				// Unknown
-
-		// Unknown String ?
-		outapp->WriteUInt32(64);			// Unknown
-		for (uint32 r = 0; r < 64; r++)
-		{
+		// *section 44
+		for (uint32 r = 0; r < 31; r++) {
 			outapp->WriteUInt8(0);				// Unknown
 		}
 
-		// Unknown String ?
-		outapp->WriteUInt32(64);			// Unknown
-		for (uint32 r = 0; r < 64; r++)
-		{
-			outapp->WriteUInt8(0);				// Unknown
-		}
+		// *section 45
+		outapp->WriteUInt32(0); // uint32 - GuildTributePoolPoints? (seems to be shared across guild?)
 
-		outapp->WriteUInt32(0);				// Unknown
-
-		// Block of 320 unknown bytes
-		for (uint32 r = 0; r < 320; r++)
-		{
-			outapp->WriteUInt8(0);				// Unknown
-		}
-
-		// Block of 343 unknown bytes
-		for (uint32 r = 0; r < 343; r++)
-		{
-			outapp->WriteUInt8(0);				// Unknown
-		}
-
-		outapp->WriteUInt32(0);				// Unknown
-
-		outapp->WriteUInt8(emu->leadAAActive);
-
-		outapp->WriteUInt32(6);				// Count ... of LDoN stats ?
+		// *section 46
+		FieldEnum = 6;
+		outapp->WriteUInt32(FieldEnum);		// Count ... of LDoN stats ?
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(emu->ldon_points_guk);
 		outapp->WriteUInt32(emu->ldon_points_mir);
 		outapp->WriteUInt32(emu->ldon_points_mmc);
 		outapp->WriteUInt32(emu->ldon_points_ruj);
 		outapp->WriteUInt32(emu->ldon_points_tak);
-
 		outapp->WriteUInt32(emu->ldon_points_available);
 
-		outapp->WriteDouble(emu->group_leadership_exp);
-		outapp->WriteDouble(emu->raid_leadership_exp);
-
-		outapp->WriteUInt32(emu->group_leadership_points);
-		outapp->WriteUInt32(emu->raid_leadership_points);
-
-		outapp->WriteUInt32(64);			// Group of 64 int32s follow	Group/Raid Leadership abilities ?
-
-		for (uint32 r = 0; r < MAX_LEADERSHIP_AA_ARRAY; r++)
-		{
-			outapp->WriteUInt32(emu->leader_abilities.ranks[r]);
-		}
-
-		for (uint32 r = 0; r < 64 - MAX_LEADERSHIP_AA_ARRAY; r++)
-		{
-			outapp->WriteUInt32(0);				// Unused/unsupported Leadership abilities
-		}
-
+		// *section 47
 		outapp->WriteUInt32(emu->air_remaining);		// ?
-
-		// PVP Stats
-
 		outapp->WriteUInt32(emu->PVPKills);
 		outapp->WriteUInt32(emu->PVPDeaths);
 		outapp->WriteUInt32(emu->PVPCurrentPoints);
@@ -2667,8 +2589,7 @@ namespace TDS
 		outapp->WriteUInt32(emu->PVPWorstDeathStreak);
 		outapp->WriteUInt32(emu->PVPCurrentKillStreak);
 
-		// Last PVP Kill
-
+		// *section 48
 		outapp->WriteString(emu->PVPLastKill.Name);
 		outapp->WriteUInt32(emu->PVPLastKill.Level);
 		outapp->WriteUInt32(emu->PVPLastKill.Race);
@@ -2677,8 +2598,7 @@ namespace TDS
 		outapp->WriteUInt32(emu->PVPLastKill.Time);
 		outapp->WriteUInt32(emu->PVPLastKill.Points);
 
-		// Last PVP Death
-
+		// *section 49
 		outapp->WriteString(emu->PVPLastDeath.Name);
 		outapp->WriteUInt32(emu->PVPLastDeath.Level);
 		outapp->WriteUInt32(emu->PVPLastDeath.Race);
@@ -2687,12 +2607,13 @@ namespace TDS
 		outapp->WriteUInt32(emu->PVPLastDeath.Time);
 		outapp->WriteUInt32(emu->PVPLastDeath.Points);
 
+		// *section 50
 		outapp->WriteUInt32(emu->PVPNumberOfKillsInLast24Hours);
 
-		// Last 50 Kills
-		outapp->WriteUInt32(50);
-		for (uint32 r = 0; r < 50; ++r)
-		{
+		// *section 51 - may have to test as 'FieldEnum = 0'
+		FieldEnum = 50; // Last 50 Kills
+		outapp->WriteUInt32(FieldEnum);
+		for (uint32 r = 0; r < FieldEnum; ++r) {
 			outapp->WriteString(emu->PVPRecentKills[r].Name);
 			outapp->WriteUInt32(emu->PVPRecentKills[r].Level);
 			outapp->WriteUInt32(emu->PVPRecentKills[r].Race);
@@ -2702,36 +2623,61 @@ namespace TDS
 			outapp->WriteUInt32(emu->PVPRecentKills[r].Points);
 		}
 
+		// *section 52
 		outapp->WriteUInt32(emu->expAA);
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(0);				// Unknown
-
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(0);				// Krono - itemid 88888 Hard coded in client?
-
 		outapp->WriteUInt8(emu->groupAutoconsent);
 		outapp->WriteUInt8(emu->raidAutoconsent);
 		outapp->WriteUInt8(emu->guildAutoconsent);
 		outapp->WriteUInt8(0);				// Unknown
-
+		outapp->WriteUInt8(0);				// Unknown
 		outapp->WriteUInt32(emu->level);	// Level3 ?
-
 		outapp->WriteUInt8(emu->showhelm);
-
 		outapp->WriteUInt32(emu->RestTimer);
 
-		outapp->WriteUInt32(1024);			// Unknown Count
-		// Block of 1024 unknown bytes
-		for (uint32 r = 0; r < 1024; r++)
-		{
+		// *section 53
+		FieldEnum = 1024;
+		outapp->WriteUInt32(FieldEnum);			// Unknown Count
+		for (uint32 r = 0; r < FieldEnum; r++) {
 			outapp->WriteUInt8(0);				// Unknown
 		}
 
-		outapp->WriteUInt32(0);				// Unknown
-		outapp->WriteUInt32(0);				// Unknown
+		// *section 54
+		FieldEnum = 0;
+		outapp->WriteUInt32(FieldEnum);			// Unknown Count
+		for (uint32 r = 0; r < FieldEnum; r++) {
+			outapp->WriteUInt32(0);				// Unknown
+			outapp->WriteUInt32(0);				// Unknown
+			outapp->WriteUInt32(0);				// Unknown
+			outapp->WriteUInt32(0);				// Unknown
+			outapp->WriteUInt32(0);				// Unknown
+		}
 
-		// Think we need 1 byte of padding at the end
-		outapp->WriteUInt8(0);				// Unknown
+		// *section 55
+		FieldEnum = 0; // can probably set to 0
+		outapp->WriteUInt32(FieldEnum);			// Unknown Count
+		for (uint32 r = 0; r < FieldEnum; r++) {
+			outapp->WriteUInt32(0);				// Unknown
+			outapp->WriteUInt32(0);				// Unknown
+			outapp->WriteUInt32(0);				// Unknown
+			outapp->WriteUInt32(0);				// Unknown
+			outapp->WriteUInt32(0);				// Unknown
+		}
+
+		// *section 56
+		outapp->WriteUInt32(0);				// Unknown
+		outapp->WriteUInt32(0);				// Unknown
+		outapp->WriteUInt32(0);				// Unknown
+		outapp->WriteUInt32(0);				// Unknown
+		outapp->WriteUInt32(0);				// Unknown
+		outapp->WriteUInt32(0);				// Unknown
+		outapp->WriteUInt8(1);				// Unknown - seen 1
+
+		// *section 57
+		outapp->WriteUInt8(0);				// Padding
 
 		Log.Out(Logs::General, Logs::Netcode, "[STRUCTS] Player Profile Packet is %i bytes", outapp->GetWritePosition());
 
@@ -4014,7 +3960,7 @@ namespace TDS
 		int k;
 		for (r = 0; r < entrycount; r++, emu++) {
 
-			int PacketSize = 206;
+			int PacketSize = 217; // was 206
 
 			PacketSize += strlen(emu->name);
 			PacketSize += strlen(emu->lastName);
@@ -4050,6 +3996,9 @@ namespace TDS
 			}
 			else
 				PacketSize += 216;
+
+			if (emu->NPC)
+				PacketSize += 12;
 
 			if (SpawnSize == 0)
 			{
@@ -4148,7 +4097,7 @@ namespace TDS
 				}
 			}
 
-			VARSTRUCT_ENCODE_TYPE(uint8, Buffer, emu->class_);
+			VARSTRUCT_ENCODE_TYPE(uint32, Buffer, emu->class_);
 			VARSTRUCT_ENCODE_TYPE(uint8, Buffer, 0);	// pvp
 			VARSTRUCT_ENCODE_TYPE(uint8, Buffer, emu->StandState);	// standstate
 			VARSTRUCT_ENCODE_TYPE(uint8, Buffer, emu->light);
@@ -4171,11 +4120,18 @@ namespace TDS
 			VARSTRUCT_ENCODE_TYPE(uint32, Buffer, 0); // unknown15
 			VARSTRUCT_ENCODE_TYPE(uint32, Buffer, 0); // unknown16
 			VARSTRUCT_ENCODE_TYPE(uint32, Buffer, 0); // unknown17
+
+			if (emu->NPC) {
+				VARSTRUCT_ENCODE_TYPE(uint32, Buffer, 0);
+				VARSTRUCT_ENCODE_TYPE(uint32, Buffer, 0);
+				VARSTRUCT_ENCODE_TYPE(uint32, Buffer, 0);
+			}
+
 			VARSTRUCT_ENCODE_TYPE(uint32, Buffer, 0xffffffff); // unknown18
 			VARSTRUCT_ENCODE_TYPE(uint32, Buffer, 0xffffffff); // unknown19
 
 			if ((emu->NPC == 0) || (emu->race <= 12) || (emu->race == 128) || (emu->race == 130) || (emu->race == 330) || (emu->race == 522))
-			{
+			{			
 				for (k = 0; k < 9; ++k)
 				{
 					{
@@ -4245,8 +4201,8 @@ namespace TDS
 			VARSTRUCT_ENCODE_STRING(Buffer, "0000000000000000");
 			VARSTRUCT_ENCODE_TYPE(uint32, Buffer, 0xffffffff);
 			VARSTRUCT_ENCODE_TYPE(uint32, Buffer, 0xffffffff);
-			// 29 zero bytes follow
-			Buffer += 29;
+			// 37 zero bytes follow
+			Buffer += 37; // was 29
 			if (Buffer != (BufferStart + PacketSize))
 			{
 				Log.Out(Logs::General, Logs::Netcode, "[ERROR] SPAWN ENCODE LOGIC PROBLEM: Buffer pointer is now %i from end", Buffer - (BufferStart + PacketSize));
