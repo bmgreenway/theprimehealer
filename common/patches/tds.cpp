@@ -2332,8 +2332,8 @@ namespace TDS
 		outapp->WriteUInt32(emu->thirst_level);
 		outapp->WriteUInt32(emu->hunger_level);
 
-		// *section 24
-		outapp->WriteUInt32(emu->aapoints_spent);
+		// section 24
+		outapp->WriteUInt32(emu->aapoints_spent); // did not show up..may be due to lack of aa's
 		FieldEnum = 6;
 		outapp->WriteUInt32(FieldEnum);
 		for (uint32 r = 0; r < FieldEnum; r++) {
@@ -2341,7 +2341,7 @@ namespace TDS
 		}
 		outapp->WriteUInt32(emu->aapoints);		// AA Points unspent
 
-		// *section 25
+		// section 25
 		outapp->WriteUInt8(0);				// Hide
 		outapp->WriteUInt8(0);				// Sneak
 
@@ -2417,7 +2417,7 @@ namespace TDS
 		outapp->WriteUInt32(0);		// Unknown - Observed 0x7cde - This is also seen in guild packets sent to this character.
 		outapp->WriteUInt32(0);		// Unknown - Observed 0x64
 
-		// *section 30
+		// section 30
 		FieldEnum = 64;
 		outapp->WriteUInt32(FieldEnum);	// Name Length
 		uint32 CurrentPosition = outapp->GetWritePosition();
@@ -2526,15 +2526,15 @@ namespace TDS
 			outapp->WriteUInt8(0);			// Unknown
 		}
 
-		// *section 41 - removed 1 uint32 write from original sequence..did not match up - could have been FieldEnum for section 42
-		outapp->WriteUInt32(0);				// Unknown
+		// section 41 - removed 1 uint32 write from original sequence..did not match up - could have been FieldEnum for section 42
 		outapp->WriteUInt32(0);				// Unknown
 		outapp->WriteUInt32(emu->currentRadCrystals);
 		outapp->WriteUInt32(emu->careerRadCrystals);
 		outapp->WriteUInt32(emu->currentEbonCrystals);
 		outapp->WriteUInt32(emu->careerEbonCrystals);
 		outapp->WriteUInt32(0);				// Unknown
-		outapp->WriteUInt32(0);				// Unknown
+		outapp->WriteUInt32(0);				// Loyalty Tokens
+		outapp->WriteUInt32(0);				// Loyalty Velocity?
 
 		// *section 42
 		FieldEnum = 64;
@@ -4413,6 +4413,9 @@ namespace TDS
 		std::string old_message = InBuffer;
 		std::string new_message;
 		TDSToServerTextLink(new_message, old_message);
+
+		if (new_message[0] == '.')
+			new_message.replace(0, 1, "#");
 
 		//__packet->size = sizeof(ChannelMessage_Struct)+strlen(InBuffer) + 1;
 		__packet->size = sizeof(ChannelMessage_Struct) + new_message.length() + 1;

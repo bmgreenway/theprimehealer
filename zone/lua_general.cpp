@@ -1816,7 +1816,8 @@ luabind::scope lua_register_client_version() {
 			luabind::value("Underfoot", static_cast<int>(ClientVersion::UF)), // deprecated
 			luabind::value("UF", static_cast<int>(ClientVersion::UF)),
 			luabind::value("RoF", static_cast<int>(ClientVersion::RoF)),
-			luabind::value("RoF2", static_cast<int>(ClientVersion::RoF2))
+			luabind::value("RoF2", static_cast<int>(ClientVersion::RoF2)),
+			luabind::value("TDS", static_cast<int>(ClientVersion::TDS))
 		];
 }
 
