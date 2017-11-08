@@ -2,8 +2,6 @@
 
 void SpellCache::InsertSpellEffect(int affect, int value, int subindex)
 {
-	sEffectCache *effect = nullptr;
-
 	auto range = m_spelleffect.equal_range(affect);
 	auto effect_iter = range.first;
 
@@ -25,8 +23,6 @@ void SpellCache::InsertSpellEffect(int affect, int value, int subindex)
 
 void SpellCache::InsertItemEffect(int affect, int value, int subindex)
 {
-	sEffectCache *effect = nullptr;
-
 	auto range = m_itemeffect.equal_range(affect);
 	auto effect_iter = range.first;
 
@@ -48,8 +44,6 @@ void SpellCache::InsertItemEffect(int affect, int value, int subindex)
 
 void SpellCache::InsertAltEffect(int affect, int value, int subindex)
 {
-	sEffectCache *effect = nullptr;
-
 	auto range = m_alteffect.equal_range(affect);
 	auto effect_iter = range.first;
 

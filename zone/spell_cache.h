@@ -61,6 +61,7 @@ private:
 	bool spell_cached;
 	bool item_cached;
 	bool alt_cached;
+	// maybe use unordered_multimap
 	std::multimap<int, sEffectCache> m_spelleffect;
 	std::multimap<int, sEffectCache> m_itemeffect;
 	std::multimap<int, sEffectCache> m_alteffect;
