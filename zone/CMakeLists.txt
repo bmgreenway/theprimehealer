@@ -112,6 +112,7 @@ SET(zone_sources
 	spawn2.h
 	spawngroup.cpp
 	special_attacks.cpp
+	spell_cache.cpp
 	spell_effects.cpp
 	spells.cpp
 	tasks.cpp
@@ -217,6 +218,7 @@ SET(zone_headers
 	spawn2.cpp
 	spawn2.h
 	spawngroup.h
+	spell_cache.h
 	string_ids.h
 	tasks.h
 	titles.h
