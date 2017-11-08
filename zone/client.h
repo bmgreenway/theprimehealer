@@ -437,6 +437,10 @@ public:
 	void EnableAreaRegens(int value);
 	void DisableAreaRegens();
 
+	// new spell cache stuff
+	virtual void RecacheItemEffects();
+	virtual void RecacheSuppressionItems(); // work around for NPC invs being dumb
+
 	void ServerFilter(SetServerFilter_Struct* filter);
 	void BulkSendTraderInventory(uint32 char_id);
 	void SendSingleTraderItem(uint32 char_id, int uniqueid);

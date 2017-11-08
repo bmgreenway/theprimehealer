@@ -6903,3 +6903,171 @@ void Client::BreakFeignDeathWhenCastOn(bool IsResisted)
 		Message_StringID(MT_SpellFailure,FD_CAST_ON);
 	}
 }
+
+/* This function will recache the buff, item, and AA SE_NegateSpellEffects
+ * This has to be done before the other effects are cached, since they make use of this data
+ * This function does not clear the cache, so we will have to do it before we call it
+ */
+void Mob::RecacheSuppressionSpells()
+{
+	// first we cache buffs
+	int buff_count = GetMaxTotalSlots();
+	for (int i = buff_count; i < buff_count; ++i) {
+		if (!IsValidSpell(buffs[i].spellid))
+			continue;
+		const auto &spell = spells[buffs[i].spellid];
+		for (int j = 0; j < EFFECT_COUNT; ++j) {
+			if (spell.effectid[j] != SE_NegateSpellEffect)
+				continue;
+			auto base = spell.base[j] == 0 ? SM_All : spell.base[j];
+			m_spell_cache.InsertSpellEffect(SE_NegateSpellEffect, m_spell_cache.GetCachedPlayerEffect(SE_NegateSpellEffect, spell.base2[j]) | base, spell.base2[j]);
+		}
+	}
+	m_spell_cache.InsertSpellEffect(SE_NegateSpellEffect, SM_All, SE_NegateSpellEffect); // this will cause it to be ignored in recache
+
+	// now we cache items -- NPC invs are dumb, so work around
+	RecacheSuppressionItems();
+
+	m_spell_cache.InsertItemEffect(SE_NegateSpellEffect, SM_All, SE_NegateSpellEffect); // this will cause it to be ignored in recache
+	// now we cache AAs
+	for (const auto &aa : aa_ranks) {
+		auto ability_rank = zone->GetAlternateAdvancementAbilityAndRank(aa.first, aa.second.first);
+		auto ability = ability_rank.first;
+		auto rank = ability_rank.second;
+
+		if (!ability || rank->effects.empty())
+			continue;
+
+		for (const auto &e : rank->effects) {
+			if (e.effect_id != SE_NegateSpellEffect)
+				continue;
+
+			auto base = e.base1 == 0 ? SM_All : e.base1;
+			m_spell_cache.InsertAltEffect(SE_NegateSpellEffect, m_spell_cache.GetCachedAltEffect(SE_NegateSpellEffect, e.base2) | base, e.base2);
+		}
+	}
+	m_spell_cache.InsertAltEffect(SE_NegateSpellEffect, SM_All, SE_NegateSpellEffect); // this will cause it to be ignored in recache
+}
+
+// NPCs and clients have incompatible inventory systems, so we work around that issue here
+void NPC::RecacheSuppressionItems()
+{
+	// luckily we get to skip augs and shit here! and tributes!
+	for (int i = 0; i < EQEmu::legacy::EQUIPMENT_SIZE; ++i) {
+		const auto cur = database.GetItem(equipment[i]);
+		if (cur->Worn.Effect > 0 && cur->Worn.Type == EQEmu::item::ItemEffectWorn) {
+			if (!IsValidSpell(cur->Worn.Effect))
+				continue;
+			const auto &spell = spells[cur->Worn.Effect];
+			for (int j = 0; j < EFFECT_COUNT; ++j) {
+				if (spell.effectid[j] != SE_NegateSpellEffect)
+					continue;
+				auto base = spell.base[j] == 0 ? SM_All : spell.base[j];
+				m_spell_cache.InsertItemEffect(SE_NegateSpellEffect, m_spell_cache.GetCachedItemEffect(SE_NegateSpellEffect, spell.base2[j]) | base, spell.base2[j]);
+			}
+		}
+	}
+}
+
+void Client::RecacheSuppressionItems()
+{
+	auto apply_effect = [this] (const EQEmu::ItemInstance *inst) {
+		const auto item = inst->GetItem();
+		if (item->Worn.Effect > 0 && item->Worn.Type == EQEmu::item::ItemEffectWorn) {
+			if (!IsValidSpell(item->Worn.Effect))
+				return;
+			const auto &spell = spells[item->Worn.Effect];
+			for (int i = 0; i < EFFECT_COUNT; ++i) {
+				if (spell.effectid[i] != SE_NegateSpellEffect)
+					continue;
+				auto base = spell.base[i] == 0 ? SM_All : spell.base[i];
+				m_spell_cache.InsertItemEffect(SE_NegateSpellEffect, m_spell_cache.GetCachedItemEffect(SE_NegateSpellEffect, spell.base2[i]) | base, spell.base2[i]);
+			}
+		}
+	};
+
+	// we don't do ammo slot here. The client also does not seem to be visiting augs
+	for (int i = EQEmu::inventory::slotCharm; i < EQEmu::inventory::slotAmmo; ++i) {
+		const auto inst = m_inv[i];
+		if (inst == nullptr || !inst->IsClassCommon() || inst->GetExp() < 0)
+			continue;
+		apply_effect(inst);
+	}
+
+	// powersource ...
+	if (ClientVersion() >= EQEmu::versions::ClientVersion::SoF) {
+		const auto inst = m_inv[EQEmu::inventory::slotPowerSource];
+		if (inst)
+			apply_effect(inst);
+	}
+
+	for (int i = 0; i < EQEmu::legacy::TRIBUTE_SIZE; ++i) {
+		const auto inst = m_inv[EQEmu::legacy::TRIBUTE_BEGIN + i];
+		if (inst == nullptr || !inst->IsClassCommon() || inst->GetExp() < 0)
+			continue;
+		apply_effect(inst);
+	}
+}
+
+int Mob::TotalEffect(int spaID, int subindex, bool bIncludeItems, bool bIncludeAA, bool bIncludeBuffs)
+{
+	// pure melee don't have mana regen
+	if ((spaID == SE_CurrentMana || spaID == SE_ManaRegen_v2) &&
+	    (GetClass() == MONK || GetClass() == ROGUE || GetClass() == WARRIOR || GetClass() == BERSERKER))
+		return 0;
+	int total = 0, item_total = 0, aa_total = 0;
+
+	// invis / see invis has special capping
+	switch (spaID) {
+	case SE_Invisibility:
+	case SE_SeeInvis:
+	case SE_InvisVsUndead:
+	case SE_InvisVsAnimals:
+	case SE_Invisibility2:
+	case SE_InvisVsUndead2:
+	case SE_ImprovedInvisAnimals:
+		if (bIncludeBuffs)
+			total = GetCachedPlayerEffect(spaID);
+		if (bIncludeItems)
+			item_total = GetCachedItemEffect(spaID);
+		if (bIncludeAA)
+			aa_total = GetCachedAltEffect(spaID);
+		return std::min(3000, std::max({total, item_total, aa_total}));
+	default:
+		break;
+	}
+
+	// SE_MovementSpeed is only items or buffs (this is client behavior so useless for custom)
+	// and they don't stack, take best or worst if one is negative
+	if (spaID == SE_MovementSpeed) {
+		if (bIncludeBuffs)
+			total = GetCachedPlayerEffect(spaID);
+		if (bIncludeItems)
+			item_total = GetCachedItemEffect(spaID);
+		if (total < 0 || item_total < 0)
+			return std::min(total, item_total);
+		return std::max(total, item_total);
+	}
+
+	// bunch of special behavior here!
+	if (spaID == SE_AttackSpeed) {
+		int haste = GetCachedPlayerEffect(SE_AttackSpeed);
+		int haste_v2 = GetCachedPlayerEffect(SE_AttackSpeed2);
+		int overhaste = GetCachedPlayerEffect(SE_AttackSpeed3);
+		int slow = GetCachedPlayerEffect(SE_AttackSpeed4);
+
+		if (slow) {
+			;
+		}
+	}
+
+	if (bIncludeBuffs)
+		total = GetCachedPlayerEffect(spaID, subindex);
+	if (bIncludeAA)
+		total += GetCachedAltEffect(spaID, subindex);
+	if (bIncludeItems) // the client is using 0 for the mana regens in items, but subindex for others ...
+		total +=
+		    GetCachedItemEffect(spaID, (spaID == SE_CurrentMana || spaID == SE_ManaRegen_v2) ? 0 : subindex);
+	return total;
+}
+

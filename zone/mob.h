@@ -25,6 +25,7 @@
 #include "position.h"
 #include "aa_ability.h"
 #include "aa.h"
+#include "spell_cache.h"
 #include "../common/light_source.h"
 #include "../common/emu_constants.h"
 #include <set>
@@ -517,6 +518,36 @@ public:
 	inline const uint8 GetTarNDX() const { return tar_ndx; }
 	inline const int8 GetFlyMode() const { return flymode; }
 	bool IsBoat() const;
+
+	// Spell Cache stuff
+	int TotalEffect(int spaID, int subindex = 0, bool bIncludeItems = true, bool bIncludeAA = true, bool bIncludeBuffs = true);
+	// this one just skips special behavior, it's /not/ usable with SPAs with special behavior
+	int TotalEffectSimple(int spaID, int subindex = 0) { return GetCachedPlayerEffect(spaID, subindex) + GetCachedItemEffect(spaID, subindex) + GetCachedAltEffect(spaID, subindex); }
+	// returns the highest, also not usable with SPAs that need special behavior, but I guess this it's own special behavior
+	int BestEffect(int spaID, int subindex = 0) { return std::max(GetCachedPlayerEffect(spaID, subindex), std::max(GetCachedItemEffect(spaID, subindex), GetCachedAltEffect(spaID, subindex))); }
+	void RecacheSpellEffects();
+	virtual void RecacheItemEffects() {} // virtual since mob/client have different inv structs
+	void RecacheAltEffects();
+	void RecacheSuppressionSpells();
+	virtual void RecacheSuppressionItems() {} // work around for invs being different for mobs/clients
+	inline int GetSuppresionSpellMask(int spaID) {
+		return GetCachedPlayerEffect(SE_NegateSpellEffect, spaID) | GetCachedItemEffect(SE_NegateSpellEffect, spaID) | GetCachedAltEffect(SE_NegateSpellEffect, spaID);
+	}
+	inline int GetCachedPlayerEffect(int spaID, int subindex = 0) {
+		if (!m_spell_cache.IsSpellCached())
+			RecacheSpellEffects();
+		return m_spell_cache.GetCachedPlayerEffect(spaID, subindex);
+	}
+	inline int GetCachedItemEffect(int spaID, int subindex = 0) {
+		if (!m_spell_cache.IsItemCached())
+			RecacheItemEffects();
+		return m_spell_cache.GetCachedItemEffect(spaID, subindex);
+	}
+	inline int GetCachedAltEffect(int spaID, int subindex = 0) {
+		if (!m_spell_cache.IsAltCached())
+			RecacheAltEffects();
+		return m_spell_cache.GetCachedAltEffect(spaID, subindex);
+	}
 
 	//Group
 	virtual bool HasRaid() = 0;
@@ -1197,6 +1228,7 @@ protected:
 	StatBonuses itembonuses;
 	StatBonuses spellbonuses;
 	StatBonuses aabonuses;
+	SpellCache m_spell_cache;
 	uint16 petid;
 	uint16 ownerid;
 	PetType typeofpet;

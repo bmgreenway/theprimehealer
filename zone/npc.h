@@ -158,6 +158,10 @@ public:
 	virtual void InitializeBuffSlots();
 	virtual void UninitializeBuffSlots();
 
+	// new spell cache stuff
+	virtual void RecacheItemEffects();
+	virtual void RecacheSuppressionItems(); // work around for NPC invs being dumb
+
 	virtual void	SetAttackTimer();
 	virtual void	RangedAttack(Mob* other);
 	virtual void	ThrowingAttack(Mob* other) { }
