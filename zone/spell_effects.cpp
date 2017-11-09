@@ -7055,9 +7055,51 @@ int Mob::TotalEffect(int spaID, int subindex, bool bIncludeItems, bool bIncludeA
 		int haste_v2 = GetCachedPlayerEffect(SE_AttackSpeed2);
 		int overhaste = GetCachedPlayerEffect(SE_AttackSpeed3);
 		int slow = GetCachedPlayerEffect(SE_AttackSpeed4);
+		int item_haste = 0; /* bIncludeItems ? item_bonuses.Haste : 0; //or something */
 
-		if (slow) {
-			;
+		if (haste) { // we have a non-zero haste
+			if (haste < 100) { // we're slowed! special case for SE_AttackSpeed4
+				int temp = 100 - slow;
+				if (haste > temp) // SE_AttackSpeed4 is hurting us more, so use that
+					haste = temp;
+			} else { // SE_AttackSpeed4 will lower our SE_AttackSpeed
+				haste -= slow;
+			}
+		} else {
+			haste = 100 - slow;
+		}
+		if (haste <= 0)
+			haste = 1;
+		// if we have no attack speed buffs, haste will be 100, if it's less than 100 we abort adn we are done :P
+		if (haste >= 100) {
+			total = haste + item_haste;
+			if (overhaste > 0) {
+				if (overhaste > 100)
+					overhaste -= 100;
+				if (GetLevel() <= 50)
+					overhaste = std::min(10, overhaste);
+				else
+					overhaste = std::min(25, overhaste);
+			}
+
+			// ItemHaste function returns value + 100
+			if (item_haste >= 100)
+				total -= 100;
+
+			if (haste_v2 > 100 && GetLevel() > 49)
+				total += std::min(haste_v2, 110) - 100;
+
+			int haste_cap = 0;
+			if (IsClient()) {
+				if (GetLevel() > 59)
+					haste_cap = 200;
+				else if (GetLevel() > 50)
+					haste_cap = 185;
+				else
+					haste_cap = GetLevel() + 125;
+			} else {
+				// Pet/NPC caps
+			}
 		}
 	}
 
