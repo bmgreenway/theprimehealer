@@ -7097,9 +7097,29 @@ int Mob::TotalEffect(int spaID, int subindex, bool bIncludeItems, bool bIncludeA
 					haste_cap = 185;
 				else
 					haste_cap = GetLevel() + 125;
-			} else {
-				// Pet/NPC caps
+			} else { // Pets/NPC
+				if (IsPetOwnerClient()) { // client checks the bSummoned flag, which seems true for PC summoned pets/swarm pets
+					haste_cap = GetLevel() + 110;
+					Mob *owner = nullptr;
+					if (IsPet())
+						owner = GetOwner();
+					else if (IsNPC() && CastToNPC()->GetSwarmOwner())
+						owner = entity_list.GetMobID(CastToNPC()->GetSwarmOwner());
+					if (owner)
+						haste_cap += std::max(0, owner->GetLevel() - 39) + std::max(0, owner->GetLevel() - 60);
+				} else {
+					haste_cap = 250; // normal NPCs
+				}
 			}
+
+			haste_cap += overhaste;
+
+			if (total)
+				total += overhaste;
+			else if (overhaste)
+				total = overhaste + 100;
+
+			return std::min(total, haste_cap);
 		}
 	}
 
