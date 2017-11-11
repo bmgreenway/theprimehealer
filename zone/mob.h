@@ -527,7 +527,6 @@ public:
 	int BestEffect(int spaID, int subindex = 0) { return std::max(GetCachedPlayerEffect(spaID, subindex), std::max(GetCachedItemEffect(spaID, subindex), GetCachedAltEffect(spaID, subindex))); }
 	void RecacheSpellEffects();
 	virtual void RecacheItemEffects() {} // virtual since mob/client have different inv structs
-	void RecacheAltEffects();
 	void RecacheSuppressionSpells();
 	virtual void RecacheSuppressionItems() {} // work around for invs being different for mobs/clients
 	inline int GetSuppresionSpellMask(int spaID) {
@@ -545,7 +544,7 @@ public:
 	}
 	inline int GetCachedAltEffect(int spaID, int subindex = 0) {
 		if (!m_spell_cache.IsAltCached())
-			RecacheAltEffects();
+			CalcAABonuses(&aabonuses);
 		return m_spell_cache.GetCachedAltEffect(spaID, subindex);
 	}
 
@@ -1225,6 +1224,7 @@ protected:
 	uint32 scalerate;
 	Buffs_Struct *buffs;
 	uint32 current_buff_count;
+	bool bItemDirty;
 	StatBonuses itembonuses;
 	StatBonuses spellbonuses;
 	StatBonuses aabonuses;

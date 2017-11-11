@@ -116,7 +116,8 @@ Mob::Mob(const char* in_name,
 		fix_z_timer(300),
 		fix_z_timer_engaged(100),
 		attack_anim_timer(1000),
-		position_update_melee_push_timer(1000)
+		position_update_melee_push_timer(1000),
+		bItemDirty(false)
 {
 	targeted = 0;
 	tar_ndx=0;

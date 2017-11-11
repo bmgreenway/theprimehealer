@@ -628,7 +628,9 @@ void Client::CalcEdibleBonuses(StatBonuses* newbon) {
 
 void Mob::CalcAABonuses(StatBonuses *newbon)
 {
-	memset(newbon, 0, sizeof(StatBonuses)); // start fresh
+	m_spell_cache.ClearAltEffect();
+
+	RecacheSuppressionSpells(); // we gotta do this :P
 
 	for (const auto &aa : aa_ranks) {
 		auto ability_rank = zone->GetAlternateAdvancementAbilityAndRank(aa.first, aa.second.first);
@@ -645,6 +647,8 @@ void Mob::CalcAABonuses(StatBonuses *newbon)
 
 		ApplyAABonuses(*rank, newbon);
 	}
+
+	m_spell_cache.SetAltCached(true);
 }
 
 //A lot of the normal spell functions (IsBlankSpellEffect, etc) are set for just spells (in common/spdat.h).
@@ -663,14 +667,14 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 	for (const auto &e : rank.effects) {
 		effect = e.effect_id;
 		base1 = e.base1;
-		base2 = e.base2;
+		base2 = 0; // only some AAs use the base2
 		slot = e.slot;
 
 		// we default to 0 (SE_CurrentHP) for the effect, so if there aren't any base1/2 values, we'll just skip it
 		if (effect == 0 && base1 == 0 && base2 == 0)
 			continue;
 
-		// IsBlankSpellEffect()
+		// IsBlankSpellEffect() -- these shouldn't be in AAs
 		if (effect == SE_Blank || (effect == SE_CHA && base1 == 0) || effect == SE_StackingCommand_Block ||
 		    effect == SE_StackingCommand_Overwrite)
 			continue;
@@ -678,11 +682,76 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 		Log(Logs::Detail, Logs::AA, "Applying Effect %d from AA %u in slot %d (base1: %d, base2: %d) on %s",
 			effect, rank.id, slot, base1, base2, GetCleanName());
 
+		// this should be removed when rewritten
 		uint8 focus = IsFocusEffect(0, 0, true, effect);
 		if (focus) {
 			newbon->FocusEffects[focus] = static_cast<uint8>(effect);
 			continue;
 		}
+
+		// SE_NegateSpellEffects
+		if (!((effect | GetSuppresionSpellMask(effect)) & SM_AAs))
+			continue;
+
+		// Okay, effects that use base2
+		switch (effect) {
+		case SE_SpellEffectResistChance:
+			if (!RuleB(Spells, Oct182017AAResistOtherSPAFix)) // this is broken before this patch
+				break;
+		case SE_Levitate:
+		case SE_CriticalHitChance:
+		case SE_MeleeSkillCheck:
+		case SE_HitChance:
+		case SE_DamageModifier:
+		case SE_MinDamageModifier:
+		case SE_SkillDamageTaken:
+		case SE_Accuracy:
+		case SE_SkillDamageAmount:
+		case SE_GiveDoubleRiposte:
+		case SE_ReduceSkillTimer:
+		case SE_RaiseSkillCap:
+		case SE_AddSingingMod:
+		case SE_RaiseStatCap:
+		case SE_HastenedAASkill:
+		case SE_AddPetCommand:
+		case SE_ReduceTradeskillFail:
+		case SE_CriticalDamageMob:
+		case SE_SkillDamageAmount2:
+			base2 = e.base2;
+			break;
+		default:
+			break;
+		}
+
+		// these don't stack and some treat base2 differently and don't stack
+		if (effect == SE_MasteryofPast || effect == SE_Assassinate || effect == SE_AssassinateLevel ||
+		    effect == SE_HeadShot || effect == SE_HeadShotLevel || effect == SE_FinishingBlowLvl ||
+		    effect == SE_FinishingBlow) {
+			if (base1 > m_spell_cache.GetCachedAltEffect(effect))
+				m_spell_cache.InsertAltEffect(effect, base1, 0);
+		} else { // stacking!
+			m_spell_cache.InsertAltEffect(effect, base1 + m_spell_cache.GetCachedAltEffect(effect), base2);
+		}
+
+		// RoF2 doesn't have SE_CriticalSpellChance here, but our AA data looks like it's processed like this
+		if (effect == SE_Assassinate || effect == SE_HeadShot || effect == SE_FinishingBlowLvl ||
+		    effect == SE_FinishingBlow || effect == SE_AssassinateLevel || effect == SE_HeadShotLevel ||
+		    effect == SE_CriticalSpellChance) {
+			base2 = e.base2; // uses base2 for fun times!
+			if (base2 > m_spell_cache.GetCachedAltEffect(effect, 1))
+				m_spell_cache.InsertAltEffect(effect, base2, 1);
+		}
+		/* TODO: Other SPAs that need special handling
+		 * SE_ProcOnKillShot
+		 * SE_SpellOnDeath
+		 * SE_SkillAttackProc
+		 * SE_SlayUndead
+		 * SE_DivineSave
+		 * SE_FrenziedDevastation
+		 * SE_SkillProc
+		 * SE_SkillProcSuccess
+		 * SE_PC_Pet_Rampage
+		 */
 
 		switch (effect) {
 		case SE_ACv2:

@@ -485,6 +485,8 @@ void Client::ResetAA() {
 	m_pp.group_leadership_exp = 0;
 	m_pp.raid_leadership_exp = 0;
 
+	m_spell_cache.SetAltCached(false);
+
 	database.DeleteCharacterLeadershipAAs(CharacterID());
 	// undefined for these clients
 	if (ClientVersionBit() & EQEmu::versions::bit_TitaniumAndEarlier)
@@ -800,6 +802,7 @@ void Client::RefundAA() {
 		Save();
 	}
 
+	m_spell_cache.SetAltCached(false);
 	SendAlternateAdvancementTable();
 	SendAlternateAdvancementPoints();
 	SendAlternateAdvancementStats();
@@ -1114,6 +1117,7 @@ void Client::FinishAlternateAdvancementPurchase(AA::Rank *rank, bool ignore_cost
 		}
 	}
 
+	m_spell_cache.SetAltCached(false);
 	CalcBonuses();
 
 	if(cost > 0) {
