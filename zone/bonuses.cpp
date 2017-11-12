@@ -690,7 +690,7 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 		}
 
 		// SE_NegateSpellEffects
-		if (!((effect | GetSuppresionSpellMask(effect)) & SM_AAs))
+		if (!(GetSuppresionSpellMask(effect) & SM_AAs))
 			continue;
 
 		// Okay, effects that use base2
