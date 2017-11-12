@@ -1477,12 +1477,14 @@ bool Client::Attack(Mob* other, int Hand, bool bRiposte, bool IsStrikethrough, b
 	///////////////////////////////////////////////////////////
 	////// Send Attack Damage
 	///////////////////////////////////////////////////////////
-	if (my_hit.damage_done > 0 && aabonuses.SkillAttackProc[0] && aabonuses.SkillAttackProc[1] == my_hit.skill &&
-		IsValidSpell(aabonuses.SkillAttackProc[2])) {
-		float chance = aabonuses.SkillAttackProc[0] / 1000.0f;
-		if (zone->random.Roll(chance))
-			SpellFinished(aabonuses.SkillAttackProc[2], other, EQEmu::CastingSlot::Item, 0, -1,
-				spells[aabonuses.SkillAttackProc[2]].ResistDiff);
+	if (my_hit.damage_done > 0 && m_spell_cache.HasSkillProcs()) {
+		auto end = m_spell_cache.skill_proc_end();
+		for (auto it = m_spell_cache.skill_proc_begin(); it != end; ++it) {
+			if (it->skill == my_hit.skill && IsValidSpell(it->spell)) {
+				if (zone->random.Roll(it->chance / 1000.0f))
+					SpellFinished(it->spell, other, EQEmu::CastingSlot::Item, 0, -1, spells[it->spell].ResistDiff);
+			}
+		}
 	}
 	other->Damage(this, my_hit.damage_done, SPELL_UNKNOWN, my_hit.skill, true, -1, false, m_specialattacks);
 

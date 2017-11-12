@@ -753,6 +753,16 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 		 * SE_PC_Pet_Rampage
 		 */
 
+		// special handling for AAs that live doesn't appear to do
+		// Alternative to this would be to just iterate over the AA list
+		switch (effect) {
+		case SE_SkillAttackProc:
+			m_spell_cache.InsertSkillProc(base1, e.base2, rank.spell);
+			break;
+		default:
+			break;
+		}
+
 		switch (effect) {
 		case SE_ACv2:
 		case SE_ArmorClass:
