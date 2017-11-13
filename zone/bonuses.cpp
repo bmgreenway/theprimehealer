@@ -757,7 +757,7 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 		// Alternative to this would be to just iterate over the AA list
 		switch (effect) {
 		case SE_SkillAttackProc:
-			m_spell_cache.InsertSkillProc(base1, e.base2, rank.spell);
+			m_spell_cache.InsertSkillAttackProc(base1, e.base2, rank.spell);
 			break;
 		default:
 			break;

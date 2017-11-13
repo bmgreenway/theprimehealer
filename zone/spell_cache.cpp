@@ -63,9 +63,9 @@ void SpellCache::InsertAltEffect(int affect, int value, int subindex)
 	effect_iter->second.base1 = value;
 }
 
-void SpellCache::InsertSkillProc(int chance, int skill, int spell)
+void SpellCache::InsertSkillAttackProc(int chance, int skill, int spell)
 {
-	m_skill_proc.push_back({chance, skill, spell});
+	m_skill_attack_proc.push_back({chance, skill, spell});
 }
 
 const SpellCache::sEffectCache *SpellCache::GetSpellCached(int affect, int subindex)
