@@ -771,9 +771,10 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 
 		// RoF2 doesn't have SE_CriticalSpellChance here, but our AA data looks like it's processed like this
 		// client doesn't handle SE_DivineSave like this
+		// we support older Frenzied Devastation SPA too, this was revamped on live at some point
 		if (effect == SE_Assassinate || effect == SE_HeadShot || effect == SE_FinishingBlowLvl ||
 		    effect == SE_FinishingBlow || effect == SE_AssassinateLevel || effect == SE_HeadShotLevel ||
-		    effect == SE_CriticalSpellChance || effect == SE_DivineSave) {
+		    effect == SE_CriticalSpellChance || effect == SE_DivineSave || effect == SE_FrenziedDevastation) {
 			base2 = e.base2; // uses base2 for fun times!
 			if (base2 > m_spell_cache.GetCachedAltEffect(effect, 1))
 				m_spell_cache.InsertAltEffect(effect, base2, 1);

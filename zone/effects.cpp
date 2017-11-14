@@ -62,8 +62,8 @@ int32 Mob::GetActSpellDamage(uint16 spell_id, int32 value, Mob* target) {
 		value -= GetAA(aaUnholyTouch) * 450; //Unholy Touch
 
 		chance = RuleI(Spells, BaseCritChance); //Wizard base critical chance is 2% (Does not scale with level)
-		chance += itembonuses.CriticalSpellChance + spellbonuses.CriticalSpellChance + aabonuses.CriticalSpellChance;
-		chance += itembonuses.FrenziedDevastation + spellbonuses.FrenziedDevastation + aabonuses.FrenziedDevastation;
+		chance += TotalEffect(SE_CriticalSpellChance, 0);
+		chance += TotalEffect(SE_FrenziedDevastation, 1);
 
 	//Crtical Hit Calculation pathway
 	if (chance > 0 || (IsClient() && GetClass() == WIZARD && GetLevel() >= RuleI(Spells, WizCritLevel))) {
@@ -79,8 +79,8 @@ int32 Mob::GetActSpellDamage(uint16 spell_id, int32 value, Mob* target) {
 
 		if (zone->random.Roll(chance)) {
 			Critical = true;
-			ratio += itembonuses.SpellCritDmgIncrease + spellbonuses.SpellCritDmgIncrease + aabonuses.SpellCritDmgIncrease;
-			ratio += itembonuses.SpellCritDmgIncNoStack + spellbonuses.SpellCritDmgIncNoStack + aabonuses.SpellCritDmgIncNoStack;
+			ratio += TotalEffect(SE_SpellCritDmgIncrease);
+			ratio += TotalEffect(SE_CriticalSpellChance, 1);
 		}
 
 		else if ((IsClient() && GetClass() == WIZARD) || (IsMerc() && GetClass() == CASTERDPS)) {
