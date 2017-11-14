@@ -2049,7 +2049,7 @@ int Mob::TryAssassinate(Mob *defender, EQEmu::skills::SkillType skillInUse)
 			if (IsClient())
 				chance += CastToClient()->GetHeroicDEX();
 			chance *= 10;
-			int norm = aabonuses.AssassinateLevel[1];
+			int norm = TotalEffect(SE_AssassinateLevel, 1);
 			if (norm > 0)
 				chance = chance * norm / 100;
 		} else if (skillInUse == EQEmu::skills::SkillThrowing) {
@@ -2059,14 +2059,11 @@ int Mob::TryAssassinate(Mob *defender, EQEmu::skills::SkillType skillInUse)
 				chance += 5;
 		}
 
-		chance += aabonuses.Assassinate[0] + spellbonuses.Assassinate[0] + itembonuses.Assassinate[0];
+		chance += TotalEffect(SE_Assassinate, 0); // base2 == 0 is chance
 
-		uint32 Assassinate_Dmg =
-		    aabonuses.Assassinate[1] + spellbonuses.Assassinate[1] + itembonuses.Assassinate[1];
+		int Assassinate_Dmg = TotalEffect(SE_Assassinate, 1); // base2 == 1 is dmg
 
-		uint8 Assassinate_Level = 0; // Get Highest Headshot Level
-		Assassinate_Level = std::max(
-		    {aabonuses.AssassinateLevel[0], spellbonuses.AssassinateLevel[0], itembonuses.AssassinateLevel[0]});
+		int Assassinate_Level = BestEffect(SE_AssassinateLevel, 0);
 
 		// revamped AAs require AA line I believe?
 		if (!Assassinate_Level)
