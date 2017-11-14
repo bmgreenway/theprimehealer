@@ -4349,20 +4349,12 @@ bool Mob::TryFinishingBlow(Mob *defender, int &damage)
 {
 	// base2 of FinishingBlowLvl is the HP limit (cur / max) * 1000, 10% is listed as 100
 	if (defender && !defender->IsClient() && defender->GetHPRatio() < 10) {
+		int FB_Dmg = TotalEffect(SE_FinishingBlow, 1);
 
-		uint32 FB_Dmg =
-			aabonuses.FinishingBlow[1] + spellbonuses.FinishingBlow[1] + itembonuses.FinishingBlow[1];
-
-		uint32 FB_Level = 0;
-		FB_Level = aabonuses.FinishingBlowLvl[0];
-		if (FB_Level < spellbonuses.FinishingBlowLvl[0])
-			FB_Level = spellbonuses.FinishingBlowLvl[0];
-		else if (FB_Level < itembonuses.FinishingBlowLvl[0])
-			FB_Level = itembonuses.FinishingBlowLvl[0];
+		int FB_Level = BestEffect(SE_FinishingBlowLvl, 0);
 
 		// modern AA description says rank 1 (500) is 50% chance
-		int ProcChance =
-			aabonuses.FinishingBlow[0] + spellbonuses.FinishingBlow[0] + spellbonuses.FinishingBlow[0];
+		int ProcChance = TotalEffect(SE_FinishingBlow, 0);
 
 		if (FB_Level && FB_Dmg && (defender->GetLevel() <= FB_Level) &&
 			(ProcChance >= zone->random.Int(1, 1000))) {
