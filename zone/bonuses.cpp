@@ -762,7 +762,7 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 		// these don't stack and some treat base2 differently and don't stack
 		if (effect == SE_MasteryofPast || effect == SE_Assassinate || effect == SE_AssassinateLevel ||
 		    effect == SE_HeadShot || effect == SE_HeadShotLevel || effect == SE_FinishingBlowLvl ||
-		    effect == SE_FinishingBlow) {
+		    effect == SE_FinishingBlow || SE_DivineSave) {
 			if (base1 > m_spell_cache.GetCachedAltEffect(effect))
 				m_spell_cache.InsertAltEffect(effect, base1, 0);
 		} else { // stacking!
@@ -770,9 +770,10 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 		}
 
 		// RoF2 doesn't have SE_CriticalSpellChance here, but our AA data looks like it's processed like this
+		// client doesn't handle SE_DivineSave like this
 		if (effect == SE_Assassinate || effect == SE_HeadShot || effect == SE_FinishingBlowLvl ||
 		    effect == SE_FinishingBlow || effect == SE_AssassinateLevel || effect == SE_HeadShotLevel ||
-		    effect == SE_CriticalSpellChance) {
+		    effect == SE_CriticalSpellChance || SE_DivineSave) {
 			base2 = e.base2; // uses base2 for fun times!
 			if (base2 > m_spell_cache.GetCachedAltEffect(effect, 1))
 				m_spell_cache.InsertAltEffect(effect, base2, 1);

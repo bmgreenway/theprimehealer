@@ -5831,16 +5831,16 @@ bool Mob::TryDivineSave()
 	-If desired, additional spells can be triggered from the AA/item/spell effect, generally a heal.
 	*/
 
-	int32 SuccessChance = aabonuses.DivineSaveChance[0] + itembonuses.DivineSaveChance[0] + spellbonuses.DivineSaveChance[0];
+	int32 SuccessChance = TotalEffect(SE_DivineSave, 0); // base2 == 0 is chances
 	if (SuccessChance && zone->random.Roll(SuccessChance))
 	{
 		SetHP(1);
 
 		int32 EffectsToTry[] =
 		{
-			aabonuses.DivineSaveChance[1],
-			itembonuses.DivineSaveChance[1],
-			spellbonuses.DivineSaveChance[1]
+			m_spell_cache.GetCachedPlayerEffect(SE_DivineSave, 1), // base2 == 1 is spell
+			m_spell_cache.GetCachedItemEffect(SE_DivineSave, 1),
+			m_spell_cache.GetCachedAltEffect(SE_DivineSave, 1)
 		};
 		//Fade the divine save effect here after saving the old effects off.
 		//That way, if desired, the effect could apply SE_DivineSave again.
