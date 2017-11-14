@@ -773,7 +773,7 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 		// client doesn't handle SE_DivineSave like this
 		if (effect == SE_Assassinate || effect == SE_HeadShot || effect == SE_FinishingBlowLvl ||
 		    effect == SE_FinishingBlow || effect == SE_AssassinateLevel || effect == SE_HeadShotLevel ||
-		    effect == SE_CriticalSpellChance || SE_DivineSave) {
+		    effect == SE_CriticalSpellChance || effect == SE_DivineSave) {
 			base2 = e.base2; // uses base2 for fun times!
 			if (base2 > m_spell_cache.GetCachedAltEffect(effect, 1))
 				m_spell_cache.InsertAltEffect(effect, base2, 1);
