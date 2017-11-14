@@ -2014,9 +2014,8 @@ int Mob::TryHeadShot(Mob *defender, EQEmu::skills::SkillType skillInUse)
 	// Only works on YOUR target.
 	if (defender && defender->GetBodyType() == BT_Humanoid && !defender->IsClient() &&
 	    skillInUse == EQEmu::skills::SkillArchery && GetTarget() == defender) {
-		uint32 HeadShot_Dmg = aabonuses.HeadShot[1] + spellbonuses.HeadShot[1] + itembonuses.HeadShot[1];
-		uint8 HeadShot_Level = 0; // Get Highest Headshot Level
-		HeadShot_Level = std::max({aabonuses.HSLevel[0], spellbonuses.HSLevel[0], itembonuses.HSLevel[0]});
+		int HeadShot_Dmg = TotalEffect(SE_HeadShot, 1);
+		int HeadShot_Level = BestEffect(SE_HeadShotLevel);
 
 		if (HeadShot_Dmg && HeadShot_Level && (defender->GetLevel() <= HeadShot_Level)) {
 			int chance = GetDEX();
@@ -2024,10 +2023,10 @@ int Mob::TryHeadShot(Mob *defender, EQEmu::skills::SkillType skillInUse)
 			if (IsClient())
 				chance += CastToClient()->GetHeroicDEX() / 25;
 			chance *= 10;
-			int norm = aabonuses.HSLevel[1];
+			int norm = TotalEffect(SE_HeadShotLevel, 1);
 			if (norm > 0)
 				chance = chance * norm / 100;
-			chance += aabonuses.HeadShot[0] + spellbonuses.HeadShot[0] + itembonuses.HeadShot[0];
+			chance += TotalEffect(SE_HeadShot, 0);
 			if (zone->random.Int(1, 1000) <= chance) {
 				entity_list.MessageClose_StringID(this, false, 200, MT_CritMelee, FATAL_BOW_SHOT,
 								  GetName());
