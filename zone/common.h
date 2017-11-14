@@ -285,6 +285,61 @@ struct Buffs_Struct {
 	bool	UpdateClient;
 };
 
+// we will use this for item stat bonus now only rather then spell effects
+// TODO: rename when other is removed
+struct StatBonuses2 {
+	int		STR;
+	int		STA;
+	int		CHA;
+	int		DEX;
+	int		INT;
+	int		AGI;
+	int		WIS;
+	int		MR;
+	int		CR;
+	int		FR;
+	int		PR;
+	int		DR;
+	int		Corrup;
+	int		HP;
+	int		Mana;
+	int		Endurance;
+	int		AC;
+	int		ProcChance;							// ProcChance/10 == % increase i = CombatEffects
+	int		MeleeMitigation;					//i = Shielding
+	int		SpellShield;
+	int		AvoidMeleeChance;					//AvoidMeleeChance/10 == % chance i = Avoidance (item mod)
+	int		HitChance;							//HitChance/15 == % increase i = Accuracy (Item: Accuracy)
+	int		StunResist;							//i
+	int		DoTShielding;
+	int		DSMitigation;						// Item Effect
+	int		HeroicSTR;
+	int		HeroicINT;
+	int		HeroicWIS;
+	int		HeroicAGI;
+	int		HeroicDEX;
+	int		HeroicSTA;
+	int		HeroicCHA;
+	int		HeroicMR;
+	int		HeroicFR;
+	int		HeroicCR;
+	int		HeroicDR;
+	int		HeroicPR;
+	int		HeroicCorrup;
+	int		HealAmt;							// Item Effect
+	int		SpellDmg;							// Item Effect
+	int		Clairvoyance;						// Item Effect
+	int		StrikeThrough;						// PoP: Strike Through %
+	int		ATK;
+	int		HPRegen;
+	int		ManaRegen;
+	int		EnduranceRegen;
+	int		DamageShield;						// this is damage done to mobs that attack this
+	int		PotionBeltSlots;
+	int		SkillMinDamageMod[9];
+	int		haste;
+};
+
 struct StatBonuses {
 	int32	AC;
 	int32	HP;
