@@ -664,6 +664,8 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 	int32 base2 = 0; // only really used for SE_RaiseStatCap & SE_ReduceSkillTimer in aa_effects table
 	uint32 slot = 0;
 
+	int last_skill_proc = 0; // some book keeping for SE_SkillProc and SE_SkillProcSuccess for SE_LimitToSkill
+
 	for (const auto &e : rank.effects) {
 		effect = e.effect_id;
 		base1 = e.base1;
@@ -692,6 +694,40 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 		// SE_NegateSpellEffects
 		if (!(GetSuppresionSpellMask(effect) & SM_AAs))
 			continue;
+
+		/* TODO: Other SPAs that need special handling
+		 * SE_ProcOnKillShot
+		 * SE_SpellOnDeath
+		 * SE_SkillAttackProc
+		 * SE_SlayUndead
+		 * SE_DivineSave
+		 * SE_FrenziedDevastation
+		 * SE_SkillProc
+		 * SE_SkillProcSuccess
+		 * SE_PC_Pet_Rampage
+		 */
+
+		// special handling for AAs that live doesn't appear to do
+		// Alternative to this would be to just iterate over the AA list
+		// each of these are special and we skip below
+		switch (effect) {
+		case SE_SkillAttackProc:
+			m_spell_cache.InsertSkillAttackProc(base1, e.base2, rank.spell);
+			continue;
+		case SE_SkillProc:
+			last_skill_proc = effect;
+			m_spell_cache.InsertSkillProcAttempt(SpellCache::eSkillProc::AA, base1, e.base2);
+			continue;
+		case SE_SkillProcSuccess:
+			last_skill_proc = effect;
+			m_spell_cache.InsertSkillProcSuccess(SpellCache::eSkillProc::AA, base1, e.base2);
+			continue;
+		case SE_LimitToSkill:
+			m_spell_cache.InsertSkillLimit(SpellCache::eSkillProc::AA, static_cast<EQEmu::skills::SkillType>(base1), last_skill_proc == SE_SkillProcSuccess);
+			continue;
+		default:
+			break;
+		}
 
 		// Okay, effects that use base2
 		switch (effect) {
@@ -741,28 +777,8 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 			if (base2 > m_spell_cache.GetCachedAltEffect(effect, 1))
 				m_spell_cache.InsertAltEffect(effect, base2, 1);
 		}
-		/* TODO: Other SPAs that need special handling
-		 * SE_ProcOnKillShot
-		 * SE_SpellOnDeath
-		 * SE_SkillAttackProc
-		 * SE_SlayUndead
-		 * SE_DivineSave
-		 * SE_FrenziedDevastation
-		 * SE_SkillProc
-		 * SE_SkillProcSuccess
-		 * SE_PC_Pet_Rampage
-		 */
 
-		// special handling for AAs that live doesn't appear to do
-		// Alternative to this would be to just iterate over the AA list
-		switch (effect) {
-		case SE_SkillAttackProc:
-			m_spell_cache.InsertSkillAttackProc(base1, e.base2, rank.spell);
-			break;
-		default:
-			break;
-		}
-
+		// TODO remove
 		switch (effect) {
 		case SE_ACv2:
 		case SE_ArmorClass:

@@ -4646,177 +4646,64 @@ void Mob::ApplyDamageTable(DamageHitInfo &hit)
 
 void Mob::TrySkillProc(Mob *on, uint16 skill, uint16 ReuseTime, bool Success, uint16 hand, bool IsDefensive)
 {
-
 	if (!on) {
 		SetTarget(nullptr);
 		Log(Logs::General, Logs::Error, "A null Mob object was passed to Mob::TrySkillProc for evaluation!");
 		return;
 	}
 
-	if (!spellbonuses.LimitToSkill[skill] && !itembonuses.LimitToSkill[skill] && !aabonuses.LimitToSkill[skill])
-		return;
-
 	/*Allow one proc from each (Spell/Item/AA)
-	Kayen: Due to limited avialability of effects on live it is too difficult
-	to confirm how they stack at this time, will adjust formula when more data is avialablle to test.*/
-	bool CanProc = true;
+	Kayen: Due to limited availability of effects on live it is too difficult
+	to confirm how they stack at this time, will adjust formula when more data is available to test.*/
 
-	uint16 base_spell_id = 0;
-	uint16 proc_spell_id = 0;
-	float ProcMod = 0;
-	float chance = 0;
+	float ProcMod = 0.0f;
+	float chance = 0.0f;
 
 	if (IsDefensive)
 		chance = on->GetSkillProcChances(ReuseTime, hand);
 	else
 		chance = GetSkillProcChances(ReuseTime, hand);
 
-	if (spellbonuses.LimitToSkill[skill]) {
+	std::vector<SpellCache::sSkillProc>::const_iterator it, end;
+	auto type = SpellCache::eSkillProc::Buff;
+	int i = 0;
 
-		for (int e = 0; e < MAX_SKILL_PROCS; e++) {
-			if (CanProc &&
-				((!Success && spellbonuses.SkillProc[e] && IsValidSpell(spellbonuses.SkillProc[e]))
-					|| (Success && spellbonuses.SkillProcSuccess[e] && IsValidSpell(spellbonuses.SkillProcSuccess[e])))) {
+	while (i < 3) {
+		if (Success) {
+			it = m_spell_cache.skill_proc_success_begin(type);
+			end = m_spell_cache.skill_proc_success_end(type);
+		} else {
+			it = m_spell_cache.skill_proc_attempt_begin(type);
+			end = m_spell_cache.skill_proc_attempt_end(type);
+		}
 
-				if (Success)
-					base_spell_id = spellbonuses.SkillProcSuccess[e];
-				else
-					base_spell_id = spellbonuses.SkillProc[e];
-
-				proc_spell_id = 0;
-				ProcMod = 0;
-
-				for (int i = 0; i < EFFECT_COUNT; i++) {
-
-					if (spells[base_spell_id].effectid[i] == SE_SkillProc || spells[base_spell_id].effectid[i] == SE_SkillProcSuccess) {
-						proc_spell_id = spells[base_spell_id].base[i];
-						ProcMod = static_cast<float>(spells[base_spell_id].base2[i]);
-					}
-
-					else if (spells[base_spell_id].effectid[i] == SE_LimitToSkill && spells[base_spell_id].base[i] <= EQEmu::skills::HIGHEST_SKILL) {
-
-						if (CanProc && spells[base_spell_id].base[i] == skill && IsValidSpell(proc_spell_id)) {
-							float final_chance = chance * (ProcMod / 100.0f);
-							if (zone->random.Roll(final_chance)) {
-								ExecWeaponProc(nullptr, proc_spell_id, on);
-								CheckNumHitsRemaining(NumHit::OffensiveSpellProcs, 0,
-									base_spell_id);
-								CanProc = false;
-								break;
-							}
-						}
-					}
-					else {
-						//Reset and check for proc in sequence
-						proc_spell_id = 0;
-						ProcMod = 0;
-					}
+		for (; it != end; ++it) {
+			// abilities that have no skill limits can always proc? (see Lingering Death, Shrouding Speed Discipline)
+			if ((it->skills.empty() ||
+			     it->skills.count(static_cast<EQEmu::skills::SkillType>(skill)) != 0) &&
+			    IsValidSpell(it->spell)) {
+				ProcMod = static_cast<float>(it->chance);
+				float final_chance = chance * (ProcMod / 100.0f);
+				if (zone->random.Roll(final_chance)) {
+					ExecWeaponProc(nullptr, it->spell, on);
+					if (type == SpellCache::eSkillProc::Buff)
+						CheckNumHitsRemaining(NumHit::OffensiveSpellProcs, 0,
+								      buffs[it->slot].spellid);
+					return; // do we want to allow others to have a chance?
 				}
 			}
 		}
-	}
 
-	if (itembonuses.LimitToSkill[skill]) {
-		CanProc = true;
-		for (int e = 0; e < MAX_SKILL_PROCS; e++) {
-			if (CanProc &&
-				((!Success && itembonuses.SkillProc[e] && IsValidSpell(itembonuses.SkillProc[e]))
-					|| (Success && itembonuses.SkillProcSuccess[e] && IsValidSpell(itembonuses.SkillProcSuccess[e])))) {
-
-				if (Success)
-					base_spell_id = itembonuses.SkillProcSuccess[e];
-				else
-					base_spell_id = itembonuses.SkillProc[e];
-
-				proc_spell_id = 0;
-				ProcMod = 0;
-
-				for (int i = 0; i < EFFECT_COUNT; i++) {
-					if (spells[base_spell_id].effectid[i] == SE_SkillProc || spells[base_spell_id].effectid[i] == SE_SkillProcSuccess) {
-						proc_spell_id = spells[base_spell_id].base[i];
-						ProcMod = static_cast<float>(spells[base_spell_id].base2[i]);
-					}
-
-					else if (spells[base_spell_id].effectid[i] == SE_LimitToSkill && spells[base_spell_id].base[i] <= EQEmu::skills::HIGHEST_SKILL) {
-
-						if (CanProc && spells[base_spell_id].base[i] == skill && IsValidSpell(proc_spell_id)) {
-							float final_chance = chance * (ProcMod / 100.0f);
-							if (zone->random.Roll(final_chance)) {
-								ExecWeaponProc(nullptr, proc_spell_id, on);
-								CanProc = false;
-								break;
-							}
-						}
-					}
-					else {
-						proc_spell_id = 0;
-						ProcMod = 0;
-					}
-				}
-			}
-		}
-	}
-
-	if (IsClient() && aabonuses.LimitToSkill[skill]) {
-
-		CanProc = true;
-		uint32 effect_id = 0;
-		int32 base1 = 0;
-		int32 base2 = 0;
-		uint32 slot = 0;
-
-		for (int e = 0; e < MAX_SKILL_PROCS; e++) {
-			if (CanProc &&
-				((!Success && aabonuses.SkillProc[e])
-					|| (Success && aabonuses.SkillProcSuccess[e]))) {
-				int aaid = 0;
-
-				if (Success)
-					base_spell_id = aabonuses.SkillProcSuccess[e];
-				else
-					base_spell_id = aabonuses.SkillProc[e];
-
-				proc_spell_id = 0;
-				ProcMod = 0;
-
-				for (auto &rank_info : aa_ranks) {
-					auto ability_rank = zone->GetAlternateAdvancementAbilityAndRank(rank_info.first, rank_info.second.first);
-					auto ability = ability_rank.first;
-					auto rank = ability_rank.second;
-
-					if (!ability) {
-						continue;
-					}
-
-					for (auto &effect : rank->effects) {
-						effect_id = effect.effect_id;
-						base1 = effect.base1;
-						base2 = effect.base2;
-						slot = effect.slot;
-
-						if (effect_id == SE_SkillProc || effect_id == SE_SkillProcSuccess) {
-							proc_spell_id = base1;
-							ProcMod = static_cast<float>(base2);
-						}
-						else if (effect_id == SE_LimitToSkill && base1 <= EQEmu::skills::HIGHEST_SKILL) {
-
-							if (CanProc && base1 == skill && IsValidSpell(proc_spell_id)) {
-								float final_chance = chance * (ProcMod / 100.0f);
-
-								if (zone->random.Roll(final_chance)) {
-									ExecWeaponProc(nullptr, proc_spell_id, on);
-									CanProc = false;
-									break;
-								}
-							}
-						}
-						else {
-							proc_spell_id = 0;
-							ProcMod = 0;
-						}
-					}
-				}
-			}
+		++i;
+		switch (i) {
+		case 1:
+			type = SpellCache::eSkillProc::Worn;
+			break;
+		case 2:
+			type = SpellCache::eSkillProc::AA;
+			break;
+		default:
+			break;
 		}
 	}
 }

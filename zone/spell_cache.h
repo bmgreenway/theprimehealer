@@ -3,6 +3,9 @@
 
 #include <map>
 #include <vector>
+#include <set>
+
+#include "../common/skills.h"
 
 class SpellCache
 {
@@ -22,6 +25,28 @@ public:
 		int spell;
 	};
 
+	// enum for skill proc functions
+	enum class eSkillProc {
+		Buff,
+		Worn,
+		AA
+	};
+
+	// this is used for SE_SkillProc and SE_SkillProcSuccess which are matched with SE_LimitToSkill
+	struct sSkillProc {
+		int chance;
+		int spell;
+		int slot; // used for buff slot when it's a buff
+		std::set<EQEmu::skills::SkillType> skills;
+	};
+
+	// we need to recache these separately
+	struct sSkillProcs {
+		std::vector<sSkillProc> buff;
+		std::vector<sSkillProc> worn;
+		std::vector<sSkillProc> aa;
+	};
+
 	SpellCache() : spell_cached(false), item_cached(false), alt_cached(false) {}
 	~SpellCache() {}
 
@@ -30,42 +55,54 @@ public:
 	void InsertAltEffect(int affect, int value, int subindex);
 	void InsertSkillAttackProc(int chace, int skill, int spell);
 
-	inline void ClearSpellEffect() { m_spelleffect.clear(); }
-	inline void ClearItemEffect() { m_itemeffect.clear(); }
-	inline void ClearAltEffect() { m_alteffect.clear(); m_skill_attack_proc.clear(); }
+	inline void ClearSpellEffect() { m_spelleffect.clear(); m_skill_proc_attempt.buff.clear(); m_skill_proc_success.buff.clear(); }
+	inline void ClearItemEffect() { m_itemeffect.clear(); m_skill_proc_attempt.worn.clear(); m_skill_proc_success.worn.clear(); }
+	inline void ClearAltEffect() { m_alteffect.clear(); m_skill_attack_proc.clear(); m_skill_proc_attempt.aa.clear(); m_skill_proc_success.aa.clear(); }
 
 	inline void SetSpellCached(bool v) { spell_cached = v; }
 	inline void SetItemCached(bool v) { item_cached = v; }
 	inline void SetAltCached(bool v) { alt_cached = v; }
 
-	inline bool IsSpellCached() { return spell_cached; }
-	inline bool IsItemCached() { return item_cached; }
-	inline bool IsAltCached() { return alt_cached; }
-	inline bool HasSkillAttackProcs() { return !m_skill_attack_proc.empty(); }
+	inline bool IsSpellCached() const { return spell_cached; }
+	inline bool IsItemCached() const { return item_cached; }
+	inline bool IsAltCached() const { return alt_cached; }
+	inline bool HasSkillAttackProcs() const { return !m_skill_attack_proc.empty(); }
 
-	const sEffectCache *GetSpellCached(int affect, int subindex = 0);
-	const sEffectCache *GetItemCached(int affect, int subindex = 0);
-	const sEffectCache *GetAltCached(int affect, int subindex = 0);
+	void InsertSkillProcAttempt(eSkillProc type, int spell, int chance, int slot = -1);
+	void InsertSkillProcSuccess(eSkillProc type, int spell, int chance, int slot = -1);
+	void InsertSkillLimit(eSkillProc type, EQEmu::skills::SkillType skill, bool on_success);
+	inline bool HasSkillProcAttempt() const { return !m_skill_proc_attempt.aa.empty() || !m_skill_proc_attempt.buff.empty() || !m_skill_proc_attempt.worn.empty(); }
+	inline bool HasSkillProcSuccess() const { return !m_skill_proc_success.aa.empty() || !m_skill_proc_success.buff.empty() || !m_skill_proc_success.worn.empty(); }
 
-	std::vector<sSkillAttackProc>::const_iterator skill_attack_proc_begin() { return m_skill_attack_proc.cbegin(); }
-	std::vector<sSkillAttackProc>::const_iterator skill_attack_proc_end() { return m_skill_attack_proc.cend(); }
+	const sEffectCache *GetSpellCached(int affect, int subindex = 0) const;
+	const sEffectCache *GetItemCached(int affect, int subindex = 0) const;
+	const sEffectCache *GetAltCached(int affect, int subindex = 0) const;
+
+	std::vector<sSkillAttackProc>::const_iterator skill_attack_proc_begin() const { return m_skill_attack_proc.cbegin(); }
+	std::vector<sSkillAttackProc>::const_iterator skill_attack_proc_end() const { return m_skill_attack_proc.cend(); }
+
+	std::vector<sSkillProc>::const_iterator skill_proc_attempt_begin(eSkillProc type) const;
+	std::vector<sSkillProc>::const_iterator skill_proc_attempt_end(eSkillProc type) const;
+
+	std::vector<sSkillProc>::const_iterator skill_proc_success_begin(eSkillProc type) const;
+	std::vector<sSkillProc>::const_iterator skill_proc_success_end(eSkillProc type) const;
 
 	// inlines for common operations
-	inline int GetCachedPlayerEffect(int affect, int subindex = 0) {
+	inline int GetCachedPlayerEffect(int affect, int subindex = 0) const {
 		auto res = GetSpellCached(affect, subindex);
 		if (res)
 			return res->base1;
 		return 0;
 	}
 
-	inline int GetCachedItemEffect(int affect, int subindex = 0) {
+	inline int GetCachedItemEffect(int affect, int subindex = 0) const {
 		auto res = GetItemCached(affect, subindex);
 		if (res)
 			return res->base1;
 		return 0;
 	}
 
-	inline int GetCachedAltEffect(int affect, int subindex = 0) {
+	inline int GetCachedAltEffect(int affect, int subindex = 0) const {
 		auto res = GetAltCached(affect, subindex);
 		if (res)
 			return res->base1;
@@ -85,6 +122,9 @@ private:
 	// if custom servers want to give someone a million of these ahhh
 	// we need something better :P
 	std::vector<sSkillAttackProc> m_skill_attack_proc;
+
+	sSkillProcs m_skill_proc_attempt; // SE_SkillProc
+	sSkillProcs m_skill_proc_success; // SE_SkillProcSuccess
 };
 
 #endif /* !SPELL_CACHE_H */
