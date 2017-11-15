@@ -772,7 +772,7 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 			if (base1 > m_spell_cache.GetCachedAltEffect(effect))
 				m_spell_cache.InsertAltEffect(effect, base1, 0);
 			break;
-		defualt: //stacking
+		default: //stacking
 			m_spell_cache.InsertAltEffect(effect, base1 + m_spell_cache.GetCachedAltEffect(effect), base2);
 			break;
 		}
