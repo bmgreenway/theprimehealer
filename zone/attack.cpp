@@ -4173,12 +4173,11 @@ void Mob::TryCriticalHit(Mob *defender, DamageHitInfo &hit, ExtraAttackOptions *
 	// 1: Try Slay Undead
 	if (defender->GetBodyType() == BT_Undead || defender->GetBodyType() == BT_SummonedUndead ||
 		defender->GetBodyType() == BT_Vampire) {
-		int SlayRateBonus = aabonuses.SlayUndead[0] + itembonuses.SlayUndead[0] + spellbonuses.SlayUndead[0];
+		int SlayRateBonus = TotalEffect(SE_SlayUndead, 0);
 		if (SlayRateBonus) {
 			float slayChance = static_cast<float>(SlayRateBonus) / 10000.0f;
 			if (zone->random.Roll(slayChance)) {
-				int SlayDmgBonus = std::max(
-				{ aabonuses.SlayUndead[1], itembonuses.SlayUndead[1], spellbonuses.SlayUndead[1] });
+				int SlayDmgBonus = BestEffect(SE_SlayUndead, 1);
 				hit.damage_done = std::max(hit.damage_done, hit.base_damage) + 5;
 				hit.damage_done = (hit.damage_done * SlayDmgBonus) / 100;
 
