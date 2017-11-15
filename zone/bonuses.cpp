@@ -760,26 +760,43 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 		}
 
 		// these don't stack and some treat base2 differently and don't stack
-		if (effect == SE_MasteryofPast || effect == SE_Assassinate || effect == SE_AssassinateLevel ||
-		    effect == SE_HeadShot || effect == SE_HeadShotLevel || effect == SE_FinishingBlowLvl ||
-		    effect == SE_FinishingBlow || SE_DivineSave) {
+		switch (effect) {
+		case SE_MasteryofPast:
+		case SE_Assassinate:
+		case SE_AssassinateLevel:
+		case SE_HeadShot:
+		case SE_HeadShotLevel:
+		case SE_FinishingBlowLvl:
+		case SE_FinishingBlow:
+		case SE_DivineSave: // non stacking
 			if (base1 > m_spell_cache.GetCachedAltEffect(effect))
 				m_spell_cache.InsertAltEffect(effect, base1, 0);
-		} else { // stacking!
+			break;
+		defualt: //stacking
 			m_spell_cache.InsertAltEffect(effect, base1 + m_spell_cache.GetCachedAltEffect(effect), base2);
+			break;
 		}
 
 		// RoF2 doesn't have SE_CriticalSpellChance here, but our AA data looks like it's processed like this
 		// client doesn't handle SE_DivineSave like this
 		// we support older Frenzied Devastation SPA too, this was revamped on live at some point
 		// SE_SlayUndead isn't done here on client, but it should work for how it works
-		if (effect == SE_Assassinate || effect == SE_HeadShot || effect == SE_FinishingBlowLvl ||
-		    effect == SE_FinishingBlow || effect == SE_AssassinateLevel || effect == SE_HeadShotLevel ||
-		    effect == SE_CriticalSpellChance || effect == SE_DivineSave || effect == SE_FrenziedDevastation ||
-		    effect == SE_SlayUndead) {
+		switch (effect) {
+		case SE_Assassinate:
+		case SE_HeadShot:
+		case SE_FinishingBlow:
+		case SE_AssassinateLevel:
+		case SE_HeadShotLevel:
+		case SE_CriticalSpellChance:
+		case SE_DivineSave:
+		case SE_FrenziedDevastation:
+		case SE_SlayUndead:
 			base2 = e.base2; // uses base2 for fun times!
 			if (base2 > m_spell_cache.GetCachedAltEffect(effect, 1))
 				m_spell_cache.InsertAltEffect(effect, base2, 1);
+			break;
+		default:
+			break;
 		}
 
 		// TODO remove
