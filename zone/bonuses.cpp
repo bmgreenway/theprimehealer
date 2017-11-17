@@ -698,13 +698,6 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 		/* TODO: Other SPAs that need special handling
 		 * SE_ProcOnKillShot
 		 * SE_SpellOnDeath
-		 * SE_SkillAttackProc
-		 * SE_SlayUndead
-		 * SE_DivineSave
-		 * SE_FrenziedDevastation
-		 * SE_SkillProc
-		 * SE_SkillProcSuccess
-		 * SE_PC_Pet_Rampage
 		 */
 
 		// special handling for AAs that live doesn't appear to do
@@ -791,6 +784,7 @@ void Mob::ApplyAABonuses(const AA::Rank &rank, StatBonuses *newbon)
 		case SE_DivineSave:
 		case SE_FrenziedDevastation:
 		case SE_SlayUndead:
+		case SE_PC_Pet_Rampage:
 			base2 = e.base2; // uses base2 for fun times!
 			if (base2 > m_spell_cache.GetCachedAltEffect(effect, 1))
 				m_spell_cache.InsertAltEffect(effect, base2, 1);
