@@ -1548,6 +1548,12 @@ struct MoveItem_Struct
 /*0012*/
 };
 
+struct MultiMoveItem_Struct
+{
+/*0000*/ int32 count;
+/*0004*/ MoveItem_Struct moves[0];
+};
+
 // both MoveItem_Struct/DeleteItem_Struct server structures will be changing to a structure-based slot format..this will
 // be used for handling SoF/SoD/etc... time stamps sent using the MoveItem_Struct format. (nothing will be done with this
 // info at the moment..but, it is forwarded on to the server for handling/future use)

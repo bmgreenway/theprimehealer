@@ -2088,6 +2088,218 @@ void Client::QSSwapItemAuditor(MoveItem_Struct* move_in, bool postaction_call) {
 	safe_delete(qspack);
 }
 
+/* The idea behind this is that we will move all the items out of their source slots
+ * into a temporary holding area. Then we will move them from the holding area to their
+ * destination slots. These steps can fail, and we will have to revert.
+ *
+ * The reason for this is because the client will say move item from slot x to slot y
+ * then move item from slot y to slot x. Which means we have to some sort of temporary
+ * area because otherwise we would just undo the move.
+ */
+
+bool Client::MoveMultipleItems(MultiMoveItem_Struct *move_in)
+{
+	// We need somewhere to hold the moves and the items need some place to live temporarily
+	std::deque<InternalMultiMoveItem> moves;
+
+	for (int i = 0; i < move_in->count; ++i) {
+		InternalMultiMoveItem m;
+		m.move.from_slot = move_in->moves[i].from_slot;
+		m.move.to_slot = move_in->moves[i].to_slot;
+		m.move.number_in_stack = move_in->moves[i].number_in_stack;
+		m.item = nullptr;
+		m.move_finished = false;
+
+		if (!IsValidSlot(m.move.from_slot)) {
+			Log(Logs::Detail, Logs::Inventory, "Invalid slot move from slot %u to slot %u with %u charges!", m.move.from_slot, m.move.to_slot, m.move.number_in_stack);
+			return false;
+		}
+
+		if (!IsValidSlot(m.move.to_slot)) {
+			Log(Logs::Detail, Logs::Inventory, "Invalid slot move from slot %u to slot %u with %u charges!", m.move.from_slot, m.move.to_slot, m.move.number_in_stack);
+			return false;
+		}
+
+		moves.push_back(m);
+	}
+
+	return MoveMultipleItems(moves);
+}
+
+bool Client::MoveMultipleItems(std::deque<InternalMultiMoveItem> &moves, bool send_packet)
+{
+	if (!MultiMovesGetItems(moves)) {
+		Log(Logs::Detail, Logs::Inventory, "MultiMovesGetItems failed!");
+		MultiMovesFailReturnItems(moves);
+		return false;
+	}
+
+	// The client also calls a function called UpdateToSlots here, I think this will make sure items can fit in destination
+	// and find where to put items that need a home (ex. when bandolier needs to remove an item)
+
+	if (!MultiMovesFinish(moves)) {
+		Log(Logs::Detail, Logs::Inventory, "MutliMovesFinish failed!");
+		MultiMovesFailRevertMoves(moves);
+		MultiMovesFailReturnItems(moves);
+		return false;
+	}
+
+	if (send_packet)
+		SendMoveMultipleItems(moves);
+
+	// Now we need to save, we couldn't do it in processing because of failure
+	// could be better ...
+	// This may save slots multiple times, can rethink later ...
+	for (auto &m : moves) {
+		database.SaveInventory(character_id, m_inv.GetItem(m.move.from_slot), m.move.from_slot);
+		database.SaveInventory(character_id, m_inv.GetItem(m.move.to_slot), m.move.to_slot);
+	}
+
+	return true;
+}
+
+bool Client::MultiMovesFinish(std::deque<InternalMultiMoveItem> &moves)
+{
+	for (auto &m : moves) {
+		if (!m.item) { // this shouldn't happen
+			Log(Logs::Detail, Logs::Inventory, "MultiMovesFinish encountered a null item!");
+			return false;
+		}
+
+		// check lore, we could be moving from shared to non-shared bank
+		if (CheckLoreConflict(m.item->GetItem())) {
+			Log(Logs::Detail, Logs::Inventory, "MultiMovesFinish encountered a lore conflict!");
+			return false;
+		}
+
+		// check we are allowed to equip it
+
+		auto dst_inst = m_inv.GetItem(m.move.to_slot);
+		// so we need to verify each of these moves are good
+		auto parent_slot = m_inv.CalcSlotId(m.move.to_slot);
+		if (parent_slot != INVALID_INDEX) { // okay, we're moving into a bag, lets verify that
+			auto bag_inst = m_inv.GetItem(parent_slot);
+
+			if (!bag_inst) {
+				Log(Logs::Detail, Logs::Inventory, "MultiMovesFinish tried moving into a null bag!");
+				return false;
+			}
+
+			if (!bag_inst->IsClassBag()) {
+				Log(Logs::Detail, Logs::Inventory, "MultiMovesFinish tried moving into a non-bag!");
+				return false;
+			}
+
+			if (!m_inv.CanItemFitInContainer(m.item->GetItem(), bag_inst->GetItem())) {
+				Log(Logs::Detail, Logs::Inventory, "MultiMovesFinish tried moving into a bag it can't fit in!");
+				return false;
+			}
+		}
+		// so at this point, we know we're moving into a valid bag or not moving into a bag at all, time to check others
+		if (dst_inst) { // okay, there is still an item here, we must be stacking
+			if (m.item->GetCharges() + dst_inst->GetCharges() > m.item->GetItem()->StackSize) {
+				Log(Logs::Detail, Logs::Inventory, "MultiMoveFinish tried to over flow a stack!");
+				return false;
+			}
+
+			if (m.item->GetItem()->ID != dst_inst->GetItem()->ID) {
+				Log(Logs::Detail, Logs::Inventory, "MutliMoveFinish tried to stack different items!");
+				return false;
+			}
+
+			dst_inst->SetCharges(m.item->GetCharges() + dst_inst->GetCharges());
+		} else { // okay, now we're not stacking so we just need to move
+			m_inv.PutItem(m.move.to_slot, *m.item);
+		}
+		m.move_finished = true;
+		safe_delete(m.item);
+	}
+	return true;
+}
+
+/* This function will move item instances out of the inventory into a temporary holding area
+ * If this returns false, we need to move them back into their source slots
+ */
+bool Client::MultiMovesGetItems(std::deque<InternalMultiMoveItem> &moves)
+{
+	for (auto &m : moves) {
+		auto inst = m_inv.GetItem(m.move.from_slot);
+		if (!inst) { // trying to move an item that doesn't exist ...
+			Log(Logs::Detail, Logs::Inventory, "MultiMovesGetItems tried to move from an empty slot!");
+			return false;
+		}
+
+		// if the item is stackable and we are not moving all the items out, we're splitting
+		if (m.move.number_in_stack > 0 && inst->IsStackable() && inst->GetCharges() != m.move.number_in_stack) {
+			if (inst->GetCharges() > m.move.number_in_stack) {
+				Log(Logs::Detail, Logs::Inventory, "MultiMovesGetItems tried to move more items in a stack than we have!");
+				return false;
+			}
+			// new instance
+			auto new_inst = database.CreateItem(inst->GetItem(), m.move.number_in_stack);
+			// modify old
+			inst->SetCharges(inst->GetCharges() - m.move.number_in_stack);
+			m.item = new_inst;
+		} else {
+			m.item = m_inv.PopItem(m.move.from_slot); // we need to steal the item!
+		}
+	}
+
+	return true;
+}
+
+/* This function will move the items back from the temporary holding area after a fail
+ */
+void Client::MultiMovesFailReturnItems(std::deque<InternalMultiMoveItem> &moves)
+{
+	for (auto &m : moves) {
+		if (!m.item) // if the item is null, we haven't stolen it yet, so nothing to fix
+			continue;
+
+		// if we moved a partial stack, we need to put them all back
+		if (m.move.number_in_stack > 0 && m.item->IsStackable() && m.item->GetCharges() != m.move.number_in_stack) {
+			auto inst = m_inv.GetItem(m.move.from_slot);
+			if (!inst) { // well shit
+				safe_delete(m.item);
+				continue;
+			}
+
+			inst->SetCharges(inst->GetCharges() + m.item->GetCharges());
+			safe_delete(m.item);
+		} else {
+			m_inv.PutItem(m.move.from_slot, *m.item);
+			safe_delete(m.item);
+		}
+	}
+}
+
+/* This function will move items back into the temporary holding area after a fail
+ */
+void Client::MultiMovesFailRevertMoves(std::deque<InternalMultiMoveItem> &moves)
+{
+	for (auto &m : moves) {
+		if (!m.move_finished) // if we haven't set this to true, we have not put the item in it's destination
+			continue;
+		m.item = m_inv.PopItem(m.move.to_slot);
+	}
+}
+
+void Client::SendMoveMultipleItems(std::deque<InternalMultiMoveItem> &moves)
+{
+	auto app = new EQApplicationPacket(OP_MoveMultipleItems, sizeof(MultiMoveItem_Struct) + sizeof(MoveItem_Struct) * moves.size());
+	auto mmi = (MultiMoveItem_Struct *)app->pBuffer;
+	mmi->count = moves.size();
+	int i = 0;
+
+	for (auto &e : moves) {
+		mmi->moves[i].from_slot = e.move.from_slot;
+		mmi->moves[i].to_slot = e.move.to_slot;
+		mmi->moves[i].number_in_stack = e.move.number_in_stack;
+		++i;
+	}
+	FastQueuePacket(&app);
+}
+
 void Client::DyeArmor(EQEmu::TintProfile* dye){
 	int16 slot=0;
 	for (int i = EQEmu::textures::textureBegin; i <= EQEmu::textures::LastTintableTexture; i++) {

@@ -1762,6 +1762,36 @@ namespace RoF
 		FINISH_ENCODE();
 	}
 
+	ENCODE(OP_MoveMultipleItems)
+	{
+		// can't use our macros :(
+		if ((*p)->size < sizeof(MultiMoveItem_Struct) + sizeof(MoveItem_Struct)) {
+			Log(Logs::Detail, Logs::Netcode,
+			    "Wrong size on outbound %s (MultiMoveItem_Struct): Got %d, expected at least %d",
+			    opcodes->EmuToName((*p)->GetOpcode()), (*p)->size,
+			    sizeof(MultiMoveItem_Struct) + sizeof(MoveItem_Struct));
+			delete *p;
+			*p = nullptr;
+			return;
+		}
+
+		SETUP_VAR_ENCODE(MultiMoveItem_Struct);
+
+		int32 count = std::abs(emu->count);
+		ALLOC_VAR_ENCODE(structs::MultiMoveItem_Struct, sizeof(structs::MultiMoveItem_Struct) +
+								    sizeof(structs::MultiMoveItemSub_Struct) * count);
+
+		OUT(count);
+
+		for (int i = 0; i < count; ++i) {
+			eq->moves[i].from_slot = ServerToRoFSlot(emu->moves[i].from_slot);
+			eq->moves[i].to_slot = ServerToRoFSlot(emu->moves[i].to_slot);
+			eq->moves[i].number_in_stack = emu->moves[i].number_in_stack;
+		}
+
+		FINISH_ENCODE();
+	}
+
 	ENCODE(OP_NewSpawn) { ENCODE_FORWARD(OP_ZoneSpawns); }
 
 	ENCODE(OP_NewZone)
@@ -4866,6 +4896,39 @@ namespace RoF
 		emu->from_slot = RoFToServerSlot(eq->from_slot);
 		emu->to_slot = RoFToServerSlot(eq->to_slot);
 		IN(number_in_stack);
+
+		FINISH_DIRECT_DECODE();
+	}
+
+	DECODE(OP_MoveMultipleItems)
+	{
+		// can't use our macros :(
+		if (__packet->size !=
+		    sizeof(structs::MultiMoveItem_Struct) + sizeof(structs::MultiMoveItemSub_Struct)) {
+			Log(Logs::Detail, Logs::Netcode,
+			    "Wrong size on incoming %s (structs::MultiMoveItem_Struct): Got %d, expected %d",
+			    opcodes->EmuToName(__packet->GetOpcode()), __packet->size,
+			    sizeof(structs::MultiMoveItem_Struct) + sizeof(structs::MultiMoveItemSub_Struct));
+			__packet->SetOpcode(OP_Unknown); /* invalidate the packet */
+			return;
+		}
+
+		// can be negative
+		int32 count = std::abs(*(int32 *)__packet->pBuffer);
+
+		unsigned char *__eq_buffer = __packet->pBuffer;
+		__packet->size = sizeof(MultiMoveItem_Struct) + count * sizeof(MoveItem_Struct);
+		__packet->pBuffer = new unsigned char[__packet->size];
+		MultiMoveItem_Struct *emu = (MultiMoveItem_Struct *) __packet->pBuffer;
+		structs::MultiMoveItem_Struct *eq = (structs::MultiMoveItem_Struct *) __eq_buffer;
+
+		IN(count);
+
+		for (int i = 0; i < count; ++i) {
+			emu->moves[i].from_slot = RoFToServerSlot(eq->moves[i].from_slot);
+			emu->moves[i].to_slot = RoFToServerSlot(eq->moves[i].to_slot);
+			emu->moves[i].number_in_stack = eq->moves[i].number_in_stack;
+		}
 
 		FINISH_DIRECT_DECODE();
 	}

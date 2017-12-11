@@ -1837,7 +1837,7 @@ struct MultiMoveItemSub_Struct
 
 struct MultiMoveItem_Struct
 {
-/*0000*/ uint32	count;
+/*0000*/ int32	count;
 /*0004*/ MultiMoveItemSub_Struct moves[0];
 };
 

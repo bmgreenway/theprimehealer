@@ -47,10 +47,12 @@ namespace Titanium
 	// server to client inventory location converters
 	static inline int16 ServerToTitaniumSlot(uint32 serverSlot);
 	static inline int16 ServerToTitaniumCorpseSlot(uint32 serverCorpseSlot);
+	//static inline structs::InventorySlot_Struct ServerToNewStyleTitaniumSlot(uint32 serverSlot, ItemPacketType PacketType = ItemPacketInvalid);
 
 	// client to server inventory location converters
 	static inline uint32 TitaniumToServerSlot(int16 titaniumSlot);
 	static inline uint32 TitaniumToServerCorpseSlot(int16 titaniumCorpseSlot);
+	//static inline uint32 NewStyleTitaniumToServerSlot(structs::InventorySlot_Struct titaniumSlot, ItemPacketType PacketType = ItemPacketInvalid);
 
 	// server to client text link converter
 	static inline void ServerToTitaniumTextLink(std::string& titaniumTextLink, const std::string& serverTextLink);
@@ -2473,6 +2475,20 @@ namespace Titanium
 		//uint32 ServerCorpse;
 		return titaniumCorpseSlot;
 	}
+
+	/*static inline uint32 NewStyleTitaniumToServerSlot(structs::InventorySlot_Struct titaniumSlot, ItemPacketType PacketType)
+	{
+		uint32 ServerSlot = INVALID_INDEX;
+		uint32 TempSlot = 0;
+
+		if (titaniumSlot.Type == invtype::InvTypePossessions) { // Worn/Personal Inventory and Cursor
+			TempSlot = titaniumSlot.Slot;
+			if (titaniumSlot.SubIndex >= EQEmu::inventory::containerBegin) // Bag Slots
+				TempSlot = (TempSlot + 3) * EQEmu::inventory::ContainerCount + titaniumSlot.SubIndex + 1;
+
+			ServerSlot = TempSlot;
+		}
+	}*/
 
 	static inline void ServerToTitaniumTextLink(std::string& titaniumTextLink, const std::string& serverTextLink)
 	{

@@ -48,7 +48,7 @@ namespace Titanium
 			InvTypeSharedBank,
 			InvTypeTrade,
 			InvTypeWorld,
-			InvTypeLimbo,
+			InvTypeLimbo,		// this is where titanium actually ends
 			InvTypeTribute,
 			InvTypeGuildTribute,
 			InvTypeMerchant,
