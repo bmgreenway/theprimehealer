@@ -5503,7 +5503,7 @@ XS(XS_Client_Freeze)
 {
 	dXSARGS;
 	if (items != 1)
-		Perl_croak(aTHX_ "Usage: Client:Freeze(THIS)");
+		Perl_croak(aTHX_ "Usage: Client::Freeze(THIS)");
 	{
 		Client *	THIS;
 
@@ -5526,7 +5526,7 @@ XS(XS_Client_UnFreeze)
 {
 	dXSARGS;
 	if (items != 1)
-		Perl_croak(aTHX_ "Usage: Client:UnFreeze(THIS)");
+		Perl_croak(aTHX_ "Usage: Client::UnFreeze(THIS)");
 	{
 		Client *	THIS;
 
@@ -6212,7 +6212,7 @@ XS(XS_Client_SendSpellAnim)
 {
 	dXSARGS;
 	if (items != 3)
-		Perl_croak(aTHX_ "Usage: SendSpellAnim(uint16 spell_id, uint32 seq)");
+		Perl_croak(aTHX_ "Usage: Client::SendSpellAnim(uint16 spell_id, uint32 seq)");
 	{
 		Client *		THIS;
 		uint16 targetid =	(uint16)SvUV(ST(1));
@@ -6316,7 +6316,7 @@ XS(XS_Client_CalcEXP)
 {
 	dXSARGS;
 	if (items < 1 || items > 2)
-		Perl_croak(aTHX_ "Usage: CalcEXP(THIS, uint8 conlevel)");
+		Perl_croak(aTHX_ "Usage: Client::CalcEXP(THIS, uint8 conlevel)");
 	{
 		Client *		THIS;
 		uint8 conlevel = 0xFF;
@@ -6394,7 +6394,7 @@ XS(XS_Client_GetMoney)
 {
 	dXSARGS;
 	if (items != 3)
-		Perl_croak(aTHX_ "Usage: GetMoney(THIS, type, subtype)");
+		Perl_croak(aTHX_ "Usage: Client::GetMoney(THIS, type, subtype)");
 	{
 		Client* THIS;
 		uint32 RETVAL;
@@ -6422,7 +6422,7 @@ XS(XS_Client_GetAccountAge);
 XS(XS_Client_GetAccountAge) {
 	dXSARGS;
 	if (items != 1)
-		Perl_croak(aTHX_ "Usage: GetAccountAge(THIS)");
+		Perl_croak(aTHX_ "Usage: Client::GetAccountAge(THIS)");
 	{
 		Client* THIS;
 		int RETVAL;

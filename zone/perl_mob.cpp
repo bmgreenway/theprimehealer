@@ -7413,7 +7413,7 @@ XS(XS_Mob_GetGlobal)
 {
 	dXSARGS;
 	if (items < 2)
-		Perl_croak(aTHX_ "Usage: GetGlobal(THIS, varname)");
+		Perl_croak(aTHX_ "Usage: Mob::GetGlobal(THIS, varname)");
 	{
 		Mob* THIS;
 		Const_char* varname = (Const_char*)SvPV_nolen(ST(1));
@@ -7444,7 +7444,7 @@ XS(XS_Mob_SetGlobal)
 {
 	dXSARGS;
 	if (items < 5 || items > 6)
-		Perl_croak(aTHX_ "Usage: SetGlobal(THIS, varname, newvalue, options, duration, other=nullptr)");
+		Perl_croak(aTHX_ "Usage: Mob::SetGlobal(THIS, varname, newvalue, options, duration, other=nullptr)");
 	{
 		Mob *		THIS;
 		char *		varname = (char *)SvPV_nolen(ST(1));
@@ -7483,7 +7483,7 @@ XS(XS_Mob_TarGlobal)
 {
 	dXSARGS;
 	if (items != 7)
-		Perl_croak(aTHX_ "Usage: TarGlobal(THIS, varname, value, duration, npcid, charid, zoneid)");
+		Perl_croak(aTHX_ "Usage: Mob::TarGlobal(THIS, varname, value, duration, npcid, charid, zoneid)");
 	{
 		Mob *		THIS;
 		char *		varname = (char *)SvPV_nolen(ST(1));
@@ -7512,7 +7512,7 @@ XS(XS_Mob_DelGlobal)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: DelGlobal(THIS, varname)");
+		Perl_croak(aTHX_ "Usage: Mob::DelGlobal(THIS, varname)");
 	{
 		Mob *		THIS;
 		char *		varname = (char *)SvPV_nolen(ST(1));
@@ -7680,7 +7680,7 @@ XS(XS_Mob_IsRunning)
 {
 	dXSARGS;
 	if (items != 1)
-		Perl_croak(aTHX_ "Usage: Mob:::IsRunning(THIS)");
+		Perl_croak(aTHX_ "Usage: Mob::IsRunning(THIS)");
 	{
 		Mob *	THIS;
 		bool RETVAL;
