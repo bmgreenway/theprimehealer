@@ -4,6 +4,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
@@ -13,15 +14,115 @@ import (
 )
 
 func main() {
-	path := "../../../zone/embparser_api.cpp"
-	err := readFile(path)
-	if err != nil {
-		log.Panicf("Failed to read file: %s", err.Error())
+	var err error
+	paths := []*Path{
+		{
+			Name:    "../../../zone/embparser_api.cpp",
+			Scope:   "General",
+			Replace: "quest",
+		},
+		{
+			Name:  "../../../zone/perl_client.cpp",
+			Scope: "Client",
+		},
+		{
+			Name:    "../../../zone/perl_doors.cpp",
+			Scope:   "Doors",
+			Replace: "door",
+		},
+		{
+			Name:  "../../../zone/perl_entity.cpp",
+			Scope: "EntityList",
+		},
+		{
+			Name:  "../../../zone/perl_groups.cpp",
+			Scope: "Group",
+		},
+		{
+			Name:  "../../../zone/perl_hateentry.cpp",
+			Scope: "HateEntry",
+		},
+		{
+			Name:  "../../../zone/perl_mob.cpp",
+			Scope: "Mob",
+		},
+		{
+			Name:  "../../../zone/perl_npc.cpp",
+			Scope: "NPC",
+		},
+		{
+			Name:  "../../../zone/perl_object.cpp",
+			Scope: "Object",
+		},
+		{
+			Name:    "../../../zone/perl_perlpacket.cpp",
+			Scope:   "PerlPacket",
+			Replace: "packet",
+		},
+		{
+			Name:  "../../../zone/perl_player_corpse.cpp",
+			Scope: "Corpse",
+		},
+		{
+			Name:  "../../../zone/perl_QuestItem.cpp",
+			Scope: "QuestItem",
+		},
+		{
+			Name:  "../../../zone/perl_raids.cpp",
+			Scope: "Raid",
+		},
 	}
+	functions := []*API{}
+	for _, path := range paths {
+		newFunctions, err := processFile(path)
+		if err != nil {
+			log.Panicf("Failed to read file: %s", err.Error())
+		}
+		for _, api := range newFunctions {
+			functions = append(functions, api)
+		}
+	}
+
+	log.Println("functions", len(functions))
+
+	outBuffer := map[string]string{}
+
+	for _, api := range functions {
+		line := ""
+
+		line += fmt.Sprintf("%s %s(", api.Return, api.Function)
+		for _, argument := range api.Arguments {
+			if strings.TrimSpace(argument.Name) == "THIS" {
+				continue
+			}
+			line += fmt.Sprintf("%s %s, ", argument.Type, argument.Name)
+		}
+		if len(api.Arguments) > 0 {
+			line = line[0 : len(line)-2]
+		}
+		line += ")\n"
+		outBuffer[api.Scope] += line
+	}
+
+	for k, v := range outBuffer {
+		log.Println(k)
+		if err = ioutil.WriteFile(k+".md", []byte(v), 0744); err != nil {
+			err = errors.Wrap(err, "Failed to write file")
+			log.Println(err)
+		}
+	}
+	log.Println("done")
 }
 
+type Path struct {
+	Name    string
+	Scope   string
+	Replace string
+}
 type API struct {
 	Function  string
+	Scope     string
+	Return    string
 	Arguments []*Argument
 }
 
@@ -31,8 +132,17 @@ type Argument struct {
 	API  *API
 }
 
-func readFile(path string) (err error) {
-	inFile, err := os.Open(path)
+func processFile(path *Path) (functions []*API, err error) {
+
+	retTypes := map[string]string{
+		"boolSV(":   "bool",
+		"PUSHu(":    "uint",
+		"PUSHi(":    "int",
+		"sv_setpv(": "string",
+		"PUSHn(":    "double",
+	}
+
+	inFile, err := os.Open(path.Name)
 	if err != nil {
 		err = errors.Wrap(err, "Failed to open file")
 	}
@@ -41,7 +151,6 @@ func readFile(path string) (err error) {
 	scanner.Split(bufio.ScanLines)
 
 	arguments := map[string][]*Argument{}
-	functions := []*API{}
 	reg, err := regexp.Compile(`\]+|\[+|\?+|[...]+`)
 	if err != nil {
 		err = errors.Wrap(err, "Failed to compile regex")
@@ -63,6 +172,14 @@ func readFile(path string) (err error) {
 		if len(line) < 1 {
 			continue
 		}
+
+		for key, val := range retTypes {
+			if strings.Contains(line, key) {
+				lastAPI.Return = val
+				break
+			}
+		}
+
 		if len(lastArguments) > 0 { //existing args to parse
 			for i, argument := range lastArguments {
 				key = fmt.Sprintf("ST(%d)", i)
@@ -177,6 +294,9 @@ func readFile(path string) (err error) {
 			newArgs = append(newArgs, args[j])
 		}
 
+		if lastAPI != nil {
+			functions = append(functions, lastAPI)
+		}
 		lastAPI = &API{
 			Function: function,
 		}
@@ -191,8 +311,6 @@ func readFile(path string) (err error) {
 			lastArguments = append(lastArguments, argument)
 		}
 		lastAPI.Arguments = lastArguments
-
-		functions = append(functions, lastAPI)
 	}
 
 	foundCount := 0
@@ -216,18 +334,54 @@ func readFile(path string) (err error) {
 	}
 	log.Println(foundCount, "functions properly identified,", failCount, "have errors")
 
-	line := ""
 	for _, api := range functions {
-		line += fmt.Sprintf("void %s(", strings.TrimSpace(api.Function))
-		for _, argument := range api.Arguments {
-			line += fmt.Sprintf("%s %s, ", argument.Type, argument.Name)
+		if len(api.Function) == 0 {
+			continue
 		}
-		if len(api.Arguments) > 0 {
-			line = line[0 : len(line)-2]
+
+		api.Function = strings.TrimSpace(api.Function)
+
+		if api.Function == `%s` {
+			continue
 		}
-		line += ")\n"
+
+		if api.Return == "" {
+			api.Return = "void"
+		}
+
+		if path.Replace == "" {
+			path.Replace = strings.ToLower(path.Scope)
+		}
+
+		if path.Scope != "General" {
+			if strings.Contains(api.Function, path.Scope+"::") {
+				api.Function = strings.Replace(api.Function, path.Scope+"::", strings.ToLower(path.Scope)+"->", -1)
+				api.Function = "$" + strings.TrimSpace(api.Function)
+			} else {
+				api.Function = "$" + strings.TrimSpace(strings.ToLower(api.Function)) + "->"
+			}
+			if strings.Contains(api.Function, "::") {
+				api.Function = strings.Replace(api.Function, "::", "->", -1)
+			}
+		} else {
+			if !strings.Contains(api.Function, path.Replace) {
+				api.Function = "quest::" + api.Function
+			}
+		}
+
+		//Figure out scope
+		if strings.Contains(api.Function, "::") {
+			api.Scope = api.Function[0:strings.Index(api.Function, "::")]
+		}
+		if strings.Contains(api.Function, "->") {
+			api.Scope = api.Function[0:strings.Index(api.Function, "->")]
+		}
+
+		if strings.Contains(api.Scope, "$") {
+			api.Scope = api.Scope[strings.Index(api.Scope, "$")+1:]
+		}
 	}
-	fmt.Println(line)
+
 	return
 }
 
@@ -329,6 +483,7 @@ var knownTypes = map[string]string{
 	"task":                      "int",
 	"task_id":                   "uint",
 	"task_id1":                  "int",
+	"spell_id":                  "int",
 	"task_id10":                 "int",
 	"task_id2":                  "int",
 	"task_set":                  "int",
