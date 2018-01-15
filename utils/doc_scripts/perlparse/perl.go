@@ -7,7 +7,9 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-yaml/yaml"
 	"github.com/pkg/errors"
@@ -51,6 +53,7 @@ func perlGenerate() (err error) {
 	//I had to do this because not every perl file aligns to scope
 	outBuffer := map[string]string{}
 
+	sort.Sort(ByName{functions})
 	//iterate functions for final output
 	for _, api := range functions {
 		if api.Scope == "" {
@@ -61,7 +64,7 @@ func perlGenerate() (err error) {
 		}
 		//prepare a new line
 		line := "* [["
-		line += fmt.Sprintf("%s(", api.Object)
+		line += fmt.Sprintf("%s%s(", api.Object, api.Function)
 		//build out arguments
 		for _, argument := range api.Arguments {
 			if strings.TrimSpace(argument.Name) == "THIS" {
@@ -79,7 +82,7 @@ func perlGenerate() (err error) {
 		}
 		//enclose function with a comment of return type
 		line += fmt.Sprintf(") # %s", api.Return)
-		line += fmt.Sprintf("|Perl-%s-%s]]\n", strings.Title(api.Scope), strings.Title(api.Function))
+		line += fmt.Sprintf("|Perl-%s-%s]]\n", api.Scope, strings.Title(api.Function))
 		//add to outbuffer based on scope
 		outBuffer[api.Scope] += line
 		isScoped := false
@@ -141,8 +144,13 @@ func perlGenerate() (err error) {
 							argument.Name = argument.Name[strings.Index(argument.Name, " ")+1:]
 						}
 
-						examplePrep += fmt.Sprintf("my $%s = %s;\n", argument.Name, exampleType)
-						exampleArgs += fmt.Sprintf("$%s, ", argument.Name)
+						if strings.TrimSpace(argument.Name) != "..." {
+							examplePrep += fmt.Sprintf("my $%s = %s;\n", argument.Name, exampleType)
+							exampleArgs += fmt.Sprintf("$%s, ", argument.Name)
+						} else {
+							exampleArgs += fmt.Sprintf("%s, ", argument.Name)
+						}
+
 						argCount++
 						arguments += fmt.Sprintf("%s|%s|%s\n", argument.Name, argument.Type, "")
 					}
@@ -152,9 +160,9 @@ func perlGenerate() (err error) {
 						exampleArgs = exampleArgs[0 : len(exampleArgs)-2]
 					}
 
-					example := fmt.Sprintf("\n```perl\n%s\n%s(%s); # Returns %s\n```", examplePrep, api.Object, exampleArgs, api.Return)
+					example := fmt.Sprintf("\n```perl\n%s\n%s%s(%s); # Returns %s\n```", examplePrep, api.Object, api.Function, exampleArgs, api.Return)
 					if api.Return != "void" {
-						example = fmt.Sprintf("\n```perl\n%smy $val = %s(%s);\nquest::say($val); # Returns %s\n```", examplePrep, api.Object, exampleArgs, api.Return)
+						example = fmt.Sprintf("\n```perl\n%smy $val = %s%s(%s);\nquest::say($val); # Returns %s\n```", examplePrep, api.Object, api.Function, exampleArgs, api.Return)
 					}
 
 					function := &FuncYaml{
@@ -174,6 +182,7 @@ func perlGenerate() (err error) {
 		if k == "" {
 			continue
 		}
+		v += fmt.Sprintf("\n\nGenerated On %s", time.Now().Format(time.RFC3339))
 		//log.Println(k)
 		//v = fmt.Sprintf("**Function**|**Summary**\n:-----|:-----\n%s", v)
 		if err = ioutil.WriteFile("out/Perl-"+strings.Title(k)+".md", []byte(v), 0744); err != nil {
@@ -202,7 +211,8 @@ func perlGenerate() (err error) {
 			if len(function.Argument) > 0 {
 				buf += fmt.Sprintf("### Arguments\n%s\n", function.Argument)
 			}
-			buf += fmt.Sprintf("### Example\n%s", function.Example)
+			buf += fmt.Sprintf("### Example\n%s\n", function.Example)
+			buf += fmt.Sprintf("\n\nGenerated On %s", time.Now().Format(time.RFC3339))
 			err = ioutil.WriteFile(fmt.Sprintf("out/Perl-%s-%s.md", strings.Title(scope.Name), function.Name), []byte(buf), 0744)
 			if err != nil {
 				err = errors.Wrapf(err, "Failed to write file %s %s", scope.Name, function.Name)
@@ -215,6 +225,7 @@ func perlGenerate() (err error) {
 
 func perlProcessFile(path *path) (functions []*API, err error) {
 
+	var index int
 	inFile, err := os.Open(path.Name)
 	if err != nil {
 		err = errors.Wrap(err, "Failed to open file")
@@ -326,8 +337,9 @@ func perlProcessFile(path *path) (functions []*API, err error) {
 		args := []string{}
 		//Find line
 		key = `Perl_croak(aTHX_ "Usage:`
-		if strings.Contains(line, key) {
-			function = line[strings.Index(line, key)+len(key):]
+		index = strings.Index(line, key)
+		if index > 0 {
+			function = line[index+len(key):]
 		}
 
 		for _, argument := range lastArguments {
@@ -464,8 +476,22 @@ func perlProcessFile(path *path) (functions []*API, err error) {
 
 		//Figure out object
 		if path.Scope != "General" {
-			api.Object = api.Function
-			if strings.Contains(api.Object, path.Scope+"::") {
+			api.Object = "$" + strings.ToLower(api.Function)
+
+			if strings.Contains(strings.ToLower(api.Object), "hate") {
+				fmt.Println(api.Object)
+			}
+			api.Object = strings.Replace(api.Object, "entitylist", "entity_list", -1)
+			api.Object = strings.Replace(api.Object, "hateentry", "hate_entry", -1)
+			index = strings.Index(api.Object, "::")
+			if index > 0 {
+				api.Object = api.Object[0:index] + "->"
+			}
+			index = strings.Index(api.Object, "->")
+			if index > 0 {
+				api.Object = api.Object[0 : index+2]
+			}
+			/*if strings.Contains(api.Object, path.Scope+"::") {
 				api.Object = strings.Replace(api.Object, path.Scope+"::", strings.ToLower(path.Scope)+"->", -1)
 				api.Object = "$" + strings.TrimSpace(api.Object)
 			} else {
@@ -473,10 +499,10 @@ func perlProcessFile(path *path) (functions []*API, err error) {
 			}
 			if strings.Contains(api.Object, "::") {
 				api.Object = strings.Replace(api.Object, "::", "->", -1)
-			}
+			}*/
 		} else {
 			if !strings.Contains(api.Object, path.Replace) {
-				api.Object = "quest::" + api.Object
+				api.Object = "quest::"
 			}
 		}
 
@@ -492,15 +518,28 @@ func perlProcessFile(path *path) (functions []*API, err error) {
 		}
 
 		//Figure out scope
-		if strings.Contains(api.Object, "::") {
-			api.Scope = api.Object[0:strings.Index(api.Object, "::")]
+		index = strings.Index(api.Object, "::")
+		if index > 0 {
+			api.Scope = api.Object[0:index]
 		}
-		if strings.Contains(api.Object, "->") {
-			api.Scope = api.Object[0:strings.Index(api.Object, "->")]
+		index = strings.Index(api.Object, "->")
+		if index > 0 {
+			api.Scope = api.Object[0:index]
 		}
 
 		if strings.Contains(api.Scope, "$") {
 			api.Scope = api.Scope[strings.Index(api.Scope, "$")+1:]
+		}
+		api.Scope = strings.Title(api.Scope)
+		//manually override weirdly spelled ones
+		if strings.ToLower(api.Scope) == "entity_list" {
+			api.Scope = "EntityList"
+		}
+		if strings.ToLower(api.Scope) == "hate_entry" {
+			api.Scope = "HateEntry"
+		}
+		if strings.ToLower(api.Scope) == "npc" {
+			api.Scope = "NPC"
 		}
 	}
 

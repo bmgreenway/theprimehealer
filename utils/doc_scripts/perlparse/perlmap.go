@@ -177,6 +177,7 @@ var perlKnownTypes = map[string]string{
 	"task":                      "int",
 	"task_id":                   "uint",
 	"task_id1":                  "int",
+	"number":                    "int",
 	"task_id10":                 "int",
 	"task_id2":                  "int",
 	"task_set":                  "int",

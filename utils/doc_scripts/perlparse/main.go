@@ -32,6 +32,15 @@ type FuncYaml struct {
 	Argument string
 }
 
+type Functions []*API
+
+func (s Functions) Len() int      { return len(s) }
+func (s Functions) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+type ByName struct{ Functions }
+
+func (s ByName) Less(i, j int) bool { return s.Functions[i].Function < s.Functions[j].Function }
+
 //API represents an endpoint
 type API struct {
 	//This is the prefix to a function
