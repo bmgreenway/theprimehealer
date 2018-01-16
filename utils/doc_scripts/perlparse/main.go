@@ -37,9 +37,18 @@ type Functions []*API
 func (s Functions) Len() int      { return len(s) }
 func (s Functions) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
-type ByName struct{ Functions }
+type FunctionsByName struct{ Functions }
 
-func (s ByName) Less(i, j int) bool { return s.Functions[i].Function < s.Functions[j].Function }
+func (s FunctionsByName) Less(i, j int) bool { return s.Functions[i].Function < s.Functions[j].Function }
+
+type Events []*Event
+
+func (s Events) Len() int      { return len(s) }
+func (s Events) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+type EventsByName struct{ Events }
+
+func (s EventsByName) Less(i, j int) bool { return s.Events[i].Name < s.Events[j].Name }
 
 //API represents an endpoint
 type API struct {
@@ -69,6 +78,13 @@ type Argument struct {
 	API *API
 	//Is optional?
 	Optional bool
+}
+
+type Event struct {
+	//Name of event, e.g. EVENT_SAY
+	Name string
+	//Arguments is a list of arguments
+	Arguments []*Argument
 }
 
 func main() {

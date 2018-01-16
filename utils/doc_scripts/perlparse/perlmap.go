@@ -68,6 +68,10 @@ var perlPaths = []*path{
 		Name:  "../../../zone/perl_raids.cpp",
 		Scope: "Raid",
 	},
+	{
+		Name:  "../../../zone/embparser.cpp",
+		Scope: "Event",
+	},
 }
 
 //These are known parameter types
@@ -201,4 +205,93 @@ var perlKnownTypes = map[string]string{
 	"zone_id":                   "int",
 	"zone_short":                "string",
 	`task_id%i`:                 "int",
+}
+
+var perlKnownEventArguments = map[string]string{}
+
+var perlKnownEventTypes = map[string]string{
+	"activity_id":         "int",    //", sep.arg[1]);
+	"caster_id":           "int",    //", extradata);
+	"charid":              "int",    //", char_id);
+	"class":               "int",    //", GetClassIDName(mob->GetClass()));
+	"clicker_id":          "int",    //", extradata);
+	"combat_state":        "int",    //", data);
+	"copper":              "int",    //", GetVar("copper." + std::string(itoa(objid))).c_str());
+	"corpse":              "int",    //", sep.arg[2]);
+	"data":                "string", //", "0");
+	"donecount":           "int",    //", sep.arg[0]);
+	"doorid":              "int",    //", data);
+	"env_damage":          "int",    //", sep.arg[0]);
+	"env_damage_type":     "int",    //", sep.arg[1]);
+	"env_final_damage":    "int",    //", sep.arg[2]);
+	"faction":             "int",    //", itoa(fac));
+	"fished_item":         "int",    //", extradata);
+	"foraged_item":        "int",    //", extradata);
+	"gold":                "int",    //", GetVar("gold." + std::string(itoa(objid))).c_str());
+	"grouped":             "int",    //", mob->IsGrouped());
+	"h":                   "int",    //", npcmob->GetHeading() );
+	"hate_state":          "int",    //", data);
+	"hpevent":             "int",    //", "-1");
+	"hpratio":             "int",    //",npcmob->GetHPRatio());
+	"inchpevent":          "int",    //", "-1");
+	"instanceid":          "int",    //", zone->GetInstanceID());
+	"instanceversion":     "int",    //", zone->GetInstanceVersion());
+	"itemid":              "int",    //", extradata);
+	"itemname":            "string", //", item_inst->GetItem()->Name);
+	"killed":              "int",    //", mob->GetNPCTypeID());
+	"killed_npc_id":       "int",    //", sep.arg[4]);
+	"killer_damage":       "int",    //", sep.arg[1]);
+	"killer_id":           "int",    //", sep.arg[0]);
+	"killer_skill":        "int",    //", sep.arg[3]);
+	"killer_spell":        "int",    //", sep.arg[2]);
+	"langid":              "int",    //", "0");
+	"looted_charges":      "int",    //", sep.arg[1]);
+	"looted_id":           "int",    //", sep.arg[0]);
+	"mlevel":              "int",    //", npcmob->GetLevel());
+	"mname":               "string", //", npcmob->GetName());
+	"mobid":               "int",    //", npcmob->GetID());
+	"name":                "string", //", mob->GetName());
+	"objectid":            "int",    //", data);
+	"option":              "int",    //", data);
+	"picked_up_entity_id": "int",    //", extradata);
+	"picked_up_id":        "int",    //", data);
+	"platinum":            "int",    //", GetVar("platinum." + std::string(itoa(objid))).c_str());
+	"popupid":             "int",    //", data);
+	"quantity":            "int",    //", item_inst->IsStackable() ? item_inst->GetCharges() : 1);
+	"race":                "int",    //", GetRaceIDName(mob->GetRace()));
+	"raided":              "int",    //", mob->IsRaidGrouped());
+	"recipe_id":           "int",    //", extradata);
+	"recipe_name":         "string", //", data);
+	"resurrect":           "int",    //", extradata);
+	"signal":              "int",    //", data);
+	"silver":              "int",    //", GetVar("silver." + std::string(itoa(objid))).c_str());
+	"skill_id":            "int",    //", sep.arg[0]);
+	"skill_level":         "int",    //", sep.arg[1]);
+	"slotid":              "int",    //", extradata);
+	"spawned_entity_id":   "int",    //", sep.arg[0]);
+	"spawned_npc_id":      "int",    //", sep.arg[1]);
+	"spell_id":            "int",    //", data);
+	"status":              "int",    //", mob->CastToClient()->Admin());
+	"target_zone_id":      "int",    //", data);
+	"targetid":            "int",    //", npcmob->GetTarget()->GetID());
+	"targetname":          "string", //", npcmob->GetTarget()->GetName());
+	"task_id":             "int",    //", data);
+	"text":                "string", //", data);
+	"timer":               "int",    //", data);
+	"uguild_id":           "int",    //", mob->CastToClient()->GuildID());
+	"uguildrank":          "int",    //", mob->CastToClient()->GuildRank());
+	"ulevel":              "int",    //", mob->GetLevel());
+	"userid":              "int",    //", mob->GetID());
+	"version":             "int",    //", zone->GetInstanceVersion());
+	"wp":                  "int",    //", data);
+	"x":                   "int",    //", npcmob->GetX() );
+	"y":                   "int",    //", npcmob->GetY() );
+	"z":                   "int",    //", npcmob->GetZ() );
+	"zonehour":            "int",    //", eqTime.hour - 1);
+	"zoneid":              "int",    //", zone->GetZoneID());
+	"zoneln":              "string", //", zone->GetLongName());
+	"zonemin":             "int",    //", eqTime.minute);
+	"zonesn":              "string", //", zone->GetShortName());
+	"zonetime":            "int",    //", (eqTime.hour - 1) * 100 + eqTime.minute);
+	"zoneweather":         "int",    //", zone->zone_weather);
 }
