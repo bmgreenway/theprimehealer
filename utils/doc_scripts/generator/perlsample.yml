@@ -5334,8 +5334,8 @@ scopes:
     example: |2-
 
       ```perl
-
-      $mob->GetHateList(); # Returns void
+      my $val = $mob->GetHateList();
+      quest::say($val); # Returns array
       ```
     argument: ""
   - name: GetHateRandom
@@ -11349,8 +11349,8 @@ scopes:
     example: |2-
 
       ```perl
-
-      $entity_list->GetClientList(); # Returns void
+      my $val = $entity_list->GetClientList();
+      quest::say($val); # Returns array
       ```
     argument: ""
   - name: GetCorpseByID
@@ -11397,8 +11397,8 @@ scopes:
     example: |2-
 
       ```perl
-
-      $entity_list->GetCorpseList(); # Returns void
+      my $val = $entity_list->GetCorpseList();
+      quest::say($val); # Returns array
       ```
     argument: ""
   - name: GetDoorsByDBID
@@ -11445,8 +11445,8 @@ scopes:
     example: |2-
 
       ```perl
-
-      $entity_list->GetDoorsList(); # Returns void
+      my $val = $entity_list->GetDoorsList();
+      quest::say($val); # Returns array
       ```
     argument: ""
   - name: GetGroupByClient
@@ -11558,8 +11558,8 @@ scopes:
     example: |2-
 
       ```perl
-
-      $entity_list->GetMobList(); # Returns void
+      my $val = $entity_list->GetMobList();
+      quest::say($val); # Returns array
       ```
     argument: ""
   - name: GetNPCByID
@@ -11593,8 +11593,8 @@ scopes:
     example: |2-
 
       ```perl
-
-      $entity_list->GetNPCList(); # Returns void
+      my $val = $entity_list->GetNPCList();
+      quest::say($val); # Returns array
       ```
     argument: ""
   - name: GetObjectByDBID
@@ -11628,8 +11628,8 @@ scopes:
     example: |2-
 
       ```perl
-
-      $entity_list->GetObjectList(); # Returns void
+      my $val = $entity_list->GetObjectList();
+      quest::say($val); # Returns array
       ```
     argument: ""
   - name: GetRaidByClient

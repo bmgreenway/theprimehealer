@@ -9,6 +9,7 @@ var perlReturnTypes = map[string]string{
 	"PUSHi(":    "int",
 	"sv_setpv(": "string",
 	"PUSHn(":    "double",
+	"XPUSHs":    "array",
 }
 
 //Paths are where every perl file is at
