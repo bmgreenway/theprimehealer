@@ -46,7 +46,7 @@ XS(XS_PerlPacket_new)
 {
 	dXSARGS;
 	if (items < 1 || items > 3)
-		Perl_croak(aTHX_ "Usage: PerlPacket::new(CLASS, opcode= \"OP_Unknown\", len= 0)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::new(class_name, op_code= \"OP_Unknown\", length = 0)");
 	{
 		char		*CLASS = (char *)SvPV_nolen(ST(0));
 		PerlPacket	*RETVAL;
@@ -100,7 +100,7 @@ XS(XS_PerlPacket_SetOpcode)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: PerlPacket::SetOpcode(THIS, opcode)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::SetOpcode(THIS, op_code)");
 	{
 		PerlPacket *		THIS;
 		bool		RETVAL;
@@ -127,7 +127,7 @@ XS(XS_PerlPacket_Resize)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: PerlPacket::Resize(THIS, len)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::Resize(THIS, length)");
 	{
 		PerlPacket *		THIS;
 		uint32		len = (uint32)SvUV(ST(1));
@@ -151,7 +151,7 @@ XS(XS_PerlPacket_SendTo)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: PerlPacket::SendTo(THIS, who)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::SendTo(THIS, client)");
 	{
 		PerlPacket *		THIS;
 		Client *		who;
@@ -230,7 +230,7 @@ XS(XS_PerlPacket_FromArray)
 {
 	dXSARGS;
 	if (items != 3)
-		Perl_croak(aTHX_ "Usage: PerlPacket::FromArray(THIS, numbers, length)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::FromArray(THIS, int_value, length)");
 	{
 		PerlPacket *		THIS;
 		int *		numbers;
@@ -272,7 +272,7 @@ XS(XS_PerlPacket_SetByte)
 {
 	dXSARGS;
 	if (items != 3)
-		Perl_croak(aTHX_ "Usage: PerlPacket::SetByte(THIS, pos, val)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::SetByte(THIS, byte_position, int_value)");
 	{
 		PerlPacket *		THIS;
 		uint32		pos = (uint32)SvUV(ST(1));
@@ -297,7 +297,7 @@ XS(XS_PerlPacket_SetShort)
 {
 	dXSARGS;
 	if (items != 3)
-		Perl_croak(aTHX_ "Usage: PerlPacket::SetShort(THIS, pos, val)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::SetShort(THIS, byte_position, int_value)");
 	{
 		PerlPacket *		THIS;
 		uint32		pos = (uint32)SvUV(ST(1));
@@ -322,7 +322,7 @@ XS(XS_PerlPacket_SetLong)
 {
 	dXSARGS;
 	if (items != 3)
-		Perl_croak(aTHX_ "Usage: PerlPacket::SetLong(THIS, pos, val)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::SetLong(THIS, byte_position, int_value)");
 	{
 		PerlPacket *		THIS;
 		uint32		pos = (uint32)SvUV(ST(1));
@@ -347,7 +347,7 @@ XS(XS_PerlPacket_SetFloat)
 {
 	dXSARGS;
 	if (items != 3)
-		Perl_croak(aTHX_ "Usage: PerlPacket::SetFloat(THIS, pos, val)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::SetFloat(THIS, byte_position, float_value)");
 	{
 		PerlPacket *		THIS;
 		uint32		pos = (uint32)SvUV(ST(1));
@@ -372,7 +372,7 @@ XS(XS_PerlPacket_SetString)
 {
 	dXSARGS;
 	if (items != 3)
-		Perl_croak(aTHX_ "Usage: PerlPacket::SetString(THIS, pos, str)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::SetString(THIS, byte_position, message)");
 	{
 		PerlPacket *		THIS;
 		uint32		pos = (uint32)SvUV(ST(1));
@@ -397,7 +397,7 @@ XS(XS_PerlPacket_SetEQ1319)
 {
 	dXSARGS;
 	if (items != 4)
-		Perl_croak(aTHX_ "Usage: PerlPacket::SetEQ1319(THIS, pos, part13, part19)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::SetEQ1319(THIS, byte_position, part13, part19)");
 	{
 		PerlPacket *		THIS;
 		uint32		pos = (uint32)SvUV(ST(1));
@@ -423,7 +423,7 @@ XS(XS_PerlPacket_SetEQ1913)
 {
 	dXSARGS;
 	if (items != 4)
-		Perl_croak(aTHX_ "Usage: PerlPacket::SetEQ1913(THIS, pos, part19, part13)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::SetEQ1913(THIS, byte_position, part19, part13)");
 	{
 		PerlPacket *		THIS;
 		uint32		pos = (uint32)SvUV(ST(1));
@@ -449,7 +449,7 @@ XS(XS_PerlPacket_GetByte)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: PerlPacket::GetByte(THIS, pos)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::GetByte(THIS, byte_position)");
 	{
 		PerlPacket *		THIS;
 		uint8		RETVAL;
@@ -476,7 +476,7 @@ XS(XS_PerlPacket_GetShort)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: PerlPacket::GetShort(THIS, pos)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::GetShort(THIS, byte_position)");
 	{
 		PerlPacket *		THIS;
 		uint16		RETVAL;
@@ -503,7 +503,7 @@ XS(XS_PerlPacket_GetLong)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: PerlPacket::GetLong(THIS, pos)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::GetLong(THIS, byte_position)");
 	{
 		PerlPacket *		THIS;
 		uint32		RETVAL;
@@ -530,7 +530,7 @@ XS(XS_PerlPacket_GetFloat)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: PerlPacket::GetFloat(THIS, pos)");
+		Perl_croak(aTHX_ "Usage: PerlPacket::GetFloat(THIS, byte_position)");
 	{
 		PerlPacket *		THIS;
 		float		RETVAL;

@@ -228,7 +228,7 @@ XS(XS_Object_SetID)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Object::SetID(THIS, set_id)");
+		Perl_croak(aTHX_ "Usage: Object::SetID(THIS, object_id)");
 	{
 		Object *		THIS;
 		uint16		set_id = (uint16)SvUV(ST(1));
@@ -539,7 +539,7 @@ XS(XS_Object_SetIcon)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Object::SetIcon(THIS, icon)");
+		Perl_croak(aTHX_ "Usage: Object::SetIcon(THIS, icon_id)");
 	{
 		Object *		THIS;
 		uint32		icon = (uint32)SvUV(ST(1));
@@ -591,7 +591,7 @@ XS(XS_Object_SetItemID)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Object::SetItemID(THIS, itemid)");
+		Perl_croak(aTHX_ "Usage: Object::SetItemID(THIS, item_id)");
 	{
 		Object *		THIS;
 		uint32		itemid = (uint32)SvUV(ST(1));
@@ -641,7 +641,7 @@ XS(XS_Object_SetX)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Object::SetX(THIS, XPos)");
+		Perl_croak(aTHX_ "Usage: Object::SetX(THIS, x)");
 	{
 		Object *		THIS;
 		float		pos = (float)SvNV(ST(1));
@@ -665,7 +665,7 @@ XS(XS_Object_SetY)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Object::SetY(THIS, YPos)");
+		Perl_croak(aTHX_ "Usage: Object::SetY(THIS, y)");
 	{
 		Object *		THIS;
 		float		pos = (float)SvNV(ST(1));
@@ -689,7 +689,7 @@ XS(XS_Object_SetZ)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Object::SetZ(THIS, ZPos)");
+		Perl_croak(aTHX_ "Usage: Object::SetZ(THIS, z)");
 	{
 		Object *		THIS;
 		float		pos = (float)SvNV(ST(1));
@@ -835,7 +835,7 @@ XS(XS_Object_GetEntityVariable)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Object::GetEntityVariable(THIS, id)");
+		Perl_croak(aTHX_ "Usage: Object::GetEntityVariable(THIS, key)");
 	{
 		Object *		THIS;
 		Const_char *id = SvPV_nolen(ST(1));
@@ -862,7 +862,7 @@ XS(XS_Object_EntityVariableExists)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Object::EntityVariableExists(THIS, id)");
+		Perl_croak(aTHX_ "Usage: Object::EntityVariableExists(THIS, message)");
 	{
 		Object *		THIS;
 		Const_char *id = SvPV_nolen(ST(1));
@@ -889,7 +889,7 @@ XS(XS_Object_SetEntityVariable)
 {
 	dXSARGS;
 	if (items != 3)
-		Perl_croak(aTHX_ "Usage: Object::SetEntityVariable(THIS, id, var)");
+		Perl_croak(aTHX_ "Usage: Object::SetEntityVariable(THIS, key, message)");
 	{
 		Object *		THIS;
 		Const_char *id = SvPV_nolen(ST(1));
@@ -1016,7 +1016,7 @@ XS(XS_Object_SetTiltX)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Object::SetTiltX(THIS, pos)");
+		Perl_croak(aTHX_ "Usage: Object::SetTiltX(THIS, x)");
 	{
 		Object *		THIS;
 		float		pos = (float)SvNV(ST(1));
@@ -1040,7 +1040,7 @@ XS(XS_Object_SetTiltY)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Object::SetTiltY(THIS, pos)");
+		Perl_croak(aTHX_ "Usage: Object::SetTiltY(THIS, y)");
 	{
 		Object *		THIS;
 		float		pos = (float)SvNV(ST(1));

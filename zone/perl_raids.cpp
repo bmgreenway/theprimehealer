@@ -74,7 +74,7 @@ XS(XS_Raid_CastGroupSpell)
 {
 	dXSARGS;
 	if (items != 4)
-		Perl_croak(aTHX_ "Usage: Raid::CastGroupSpell(THIS, caster, spellid, gid)");
+		Perl_croak(aTHX_ "Usage: Raid::CastGroupSpell(THIS, mob_caster, spell_id, group_id)");
 	{
 		Raid *		THIS;
 		Mob*		caster;
@@ -109,7 +109,7 @@ XS(XS_Raid_GroupCount)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Raid::GroupCount(THIS, gid)");
+		Perl_croak(aTHX_ "Usage: Raid::GroupCount(THIS, group_id)");
 	{
 		Raid *		THIS;
 		uint8		RETVAL;
@@ -189,7 +189,7 @@ XS(XS_Raid_SplitExp)
 {
 	dXSARGS;
 	if (items != 3)
-		Perl_croak(aTHX_ "Usage: Raid::SplitExp(THIS, exp, other)");
+		Perl_croak(aTHX_ "Usage: Raid::SplitExp(THIS, exp, mob_other)");
 	{
 		Raid *		THIS;
 		uint32		exp = (uint32)SvUV(ST(1));
@@ -223,7 +223,7 @@ XS(XS_Raid_GetTotalRaidDamage)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Raid::GetTotalRaidDamage(THIS, other)");
+		Perl_croak(aTHX_ "Usage: Raid::GetTotalRaidDamage(THIS, mob_other)");
 	{
 		Raid *		THIS;
 		uint32		RETVAL;
@@ -286,7 +286,7 @@ XS(XS_Raid_BalanceHP)
 {
 	dXSARGS;
 	if (items != 3)
-		Perl_croak(aTHX_ "Usage: Raid::BalanceHP(THIS, penalty, gid)");
+		Perl_croak(aTHX_ "Usage: Raid::BalanceHP(THIS, int_penalty, group_id)");
 	{
 		Raid *		THIS;
 		int32		penalty = (int32)SvUV(ST(1));
@@ -338,7 +338,7 @@ XS(XS_Raid_IsGroupLeader)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: Raid::IsGroupLeader(THIS, who)");
+		Perl_croak(aTHX_ "Usage: Raid::IsGroupLeader(THIS, name)");
 	{
 		Raid *		THIS;
 		bool		RETVAL;
@@ -444,7 +444,7 @@ XS(XS_Raid_TeleportGroup)
 {
 	dXSARGS;
 	if (items != 8)
-		Perl_croak(aTHX_ "Usage: Raid::TeleportGroup(THIS, sender, zoneID, x, y, z, heading, gid)");
+		Perl_croak(aTHX_ "Usage: Raid::TeleportGroup(THIS, mob_sender, zone_id, x, y, z, heading, group_id)");
 	{
 		Raid *		THIS;
 		Mob*		sender;
@@ -483,7 +483,7 @@ XS(XS_Raid_TeleportRaid)
 {
 	dXSARGS;
 	if (items != 7)
-		Perl_croak(aTHX_ "Usage: Raid::TeleportRaid(THIS, sender, zoneID, x, y, z, heading)");
+		Perl_croak(aTHX_ "Usage: Raid::TeleportRaid(THIS, mob_sender, zone_id, x, y, z, heading)");
 	{
 		Raid *		THIS;
 		Mob*		sender;

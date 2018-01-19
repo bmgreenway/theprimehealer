@@ -332,6 +332,9 @@ func perlProcessFile(path *path) (functions []*API, events []*Event, err error) 
 	foundCount := 0
 	failCount := 0
 	for key, val := range arguments {
+		if key == "THIS" {
+			continue
+		}
 		isMissing := false
 		line := ""
 		line = fmt.Sprintf("%s used by %d functions:", key, len(val))

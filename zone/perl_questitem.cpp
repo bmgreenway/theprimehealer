@@ -62,7 +62,7 @@ XS(XS_QuestItem_SetScale)
 {
 	dXSARGS;
 	if (items != 2)
-		Perl_croak(aTHX_ "Usage: QuestItem::SetScale(THIS, scale factor)");
+		Perl_croak(aTHX_ "Usage: QuestItem::SetScale(THIS, scale_factor)");
 	{
 		EQEmu::ItemInstance *	THIS;
 		float		Mult;
@@ -90,7 +90,7 @@ XS(XS_QuestItem_ItemSay)
 {
 	dXSARGS;
 	if (items != 2 && items != 3)
-		Perl_croak(aTHX_ "Usage: QuestItem::ItemSay(THIS, text [, language])");
+		Perl_croak(aTHX_ "Usage: QuestItem::ItemSay(THIS, message, [language_id])");
 	{
 		EQEmu::ItemInstance*	THIS;
 		Const_char*	text;
