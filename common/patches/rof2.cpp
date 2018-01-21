@@ -4021,8 +4021,11 @@ namespace RoF2
 		OUT(y);
 		OUT(x);
 		OUT(z)
-			OUT(zone_reason);
+		OUT(zone_reason);
 		OUT(success);
+
+		if (eq->success < 0)
+			eq->success -= 1;
 
 		FINISH_ENCODE();
 	}
