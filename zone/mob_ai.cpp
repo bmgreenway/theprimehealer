@@ -381,7 +381,7 @@ bool EntityList::AICheckCloseBeneficialSpells(NPC* caster, uint8 iChance, float 
 	//Only iterate through NPCs
 	for (auto it = npc_list.begin(); it != npc_list.end(); ++it) {
 		NPC* mob = it->second;
-	
+
 		if (mob->GetReverseFactionCon(caster) >= FACTION_KINDLY) {
 			continue;
 		}
@@ -464,7 +464,7 @@ void Mob::AI_Start(uint32 iMoveDelay) {
 
 	if(CastToNPC()->WillAggroNPCs())
 		AI_scan_area_timer = std::unique_ptr<Timer>(new Timer(RandomTimer(RuleI(NPC, NPCToNPCAggroTimerMin), RuleI(NPC, NPCToNPCAggroTimerMax))));
-	
+
 	AI_check_signal_timer = std::unique_ptr<Timer>(new Timer(AI_check_signal_timer_delay));
 
 
@@ -1021,6 +1021,11 @@ void Mob::AI_Process() {
 
 		if (!(m_PlayerState & static_cast<uint32>(PlayerState::Aggressive)))
 			SendAddPlayerState(PlayerState::Aggressive);
+
+		// NPCs will forget people after 10 mins of not interacting with them or out of range
+		// both of these maybe zone specific, hardcoded for now
+		if (mHateListCleanup.Check())
+			hate_list.RemoveStaleEntries(600000, 600.0f);
 		// we are prevented from getting here if we are blind and don't have a target in range
 		// from above, so no extra blind checks needed
 		if ((IsRooted() && !GetSpecialAbility(IGNORE_ROOT_AGGRO_RULES)) || IsBlind())
@@ -1391,19 +1396,33 @@ void Mob::AI_Process() {
 						//if(owner->IsClient())
 						//	printf("Pet start pos: (%f, %f, %f)\n", GetX(), GetY(), GetZ());
 
-						float dist = DistanceSquared(m_Position, owner->GetPosition());
-						if (dist >= 400)
+						glm::vec4 ownerPos = owner->GetPosition();
+						float dist = DistanceSquared(m_Position, ownerPos);
+						float distz = ownerPos.z - m_Position.z;
+
+						if (dist >= 400 || distz > 100)
 						{
 							int speed = GetWalkspeed();
 							if (dist >= 5625)
 								speed = GetRunspeed();
 
-							CalculateNewPosition2(owner->GetX(), owner->GetY(), owner->GetZ(), speed);
+							if (distz > 100)
+							{
+								m_Position = ownerPos;
+								SendPositionUpdate();
+								moved = true;
+							}
+							else
+							{
+							CalculateNewPosition2(owner->GetX(),
+								owner->GetY(), owner->GetZ(), speed);
+							}
 						}
 						else
 						{
 							if(moved)
 							{
+								this->FixZ();
 								SetCurrentSpeed(0);
 								moved = false;
 							}
@@ -1535,14 +1554,14 @@ void NPC::AI_DoMovement() {
 				roambox_movingto_x = zone->random.Real(roambox_min_x+1,roambox_max_x-1);
 			if (roambox_movingto_y > roambox_max_y || roambox_movingto_y < roambox_min_y)
 				roambox_movingto_y = zone->random.Real(roambox_min_y+1,roambox_max_y-1);
-			Log(Logs::Detail, Logs::AI, 
+			Log(Logs::Detail, Logs::AI,
 				"Roam Box: d=%.3f (%.3f->%.3f,%.3f->%.3f): Go To (%.3f,%.3f)",
-				roambox_distance, roambox_min_x, roambox_max_x, roambox_min_y, 
+				roambox_distance, roambox_min_x, roambox_max_x, roambox_min_y,
 				roambox_max_y, roambox_movingto_x, roambox_movingto_y);
 		}
 
 		// Keep calling with updates, using wherever we are in Z.
-		if (!MakeNewPositionAndSendUpdate(roambox_movingto_x, 
+		if (!MakeNewPositionAndSendUpdate(roambox_movingto_x,
 				roambox_movingto_y, m_Position.z, walksp))
 		{
 			this->FixZ(); // FixZ on final arrival point.
@@ -1573,7 +1592,7 @@ void NPC::AI_DoMovement() {
 				if (m_CurrentWayPoint.x == GetX() && m_CurrentWayPoint.y == GetY())
 				{	// are we there yet? then stop
 					Log(Logs::Detail, Logs::AI, "We have reached waypoint %d (%.3f,%.3f,%.3f) on grid %d", cur_wp, GetX(), GetY(), GetZ(), GetGrid());
-					
+
 					SetWaypointPause();
 					SetAppearance(eaStanding, false);
 					SetMoving(false);
@@ -1747,6 +1766,12 @@ void Mob::AI_Event_Engaged(Mob* attacker, bool iYellForHelp) {
 		return;
 
 	SetAppearance(eaStanding);
+
+	/*
+		Kick off auto cast timer
+	*/
+	if (this->IsNPC())
+		this->CastToNPC()->AIautocastspell_timer->Start(300, false);
 
 	if (iYellForHelp) {
 		if(IsPet()) {

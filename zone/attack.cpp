@@ -2686,7 +2686,7 @@ void Mob::AddToHateList(Mob* other, uint32 hate /*= 0*/, int32 damage /*= 0*/, b
 
 	hate_list.AddEntToHateList(other, hate, damage, bFrenzy, !iBuffTic);
 
-	if (other->IsClient() && !on_hatelist)
+	if (other->IsClient() && !on_hatelist && !IsOnFeignMemory(other->CastToClient()))
 		other->CastToClient()->AddAutoXTarget(this);
 
 #ifdef BOTS
@@ -3362,6 +3362,12 @@ void Mob::CommonDamage(Mob* attacker, int &damage, const uint16 spell_id, const 
 
 	if (!ignore_invul && (GetInvul() || DivineAura())) {
 		Log(Logs::Detail, Logs::Combat, "Avoiding %d damage due to invulnerability.", damage);
+		damage = DMG_INVULNERABLE;
+	}
+
+	// this should actually happen MUCH sooner, need to investigate though -- good enough for now
+	if ((skill_used == EQEmu::skills::SkillArchery || skill_used == EQEmu::skills::SkillThrowing) && GetSpecialAbility(IMMUNE_RANGED_ATTACKS)) {
+		Log(Logs::Detail, Logs::Combat, "Avoiding %d damage due to IMMUNE_RANGED_ATTACKS.", damage);
 		damage = DMG_INVULNERABLE;
 	}
 

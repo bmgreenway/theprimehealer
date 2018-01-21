@@ -1307,7 +1307,7 @@ bool Mob::SpellEffect(Mob* caster, uint16 spell_id, float partial, int level_ove
 #endif
 				if (caster)
 					effect_value = caster->ApplySpellEffectiveness(spell_id, effect_value);
-				
+
 				buffs[buffslot].melee_rune = effect_value;
 				break;
 			}
@@ -1796,8 +1796,12 @@ bool Mob::SpellEffect(Mob* caster, uint16 spell_id, float partial, int level_ove
 								Message_StringID(4, CORPSE_CANT_SENSE);
 							}
 						}
-						else if (caster)
-							caster->Message_StringID(MT_SpellFailure, SPELL_LEVEL_REQ);
+						else if (caster) {
+							char level[4];
+							ConvertArray(effect_value, level);
+							caster->Message_StringID(MT_SpellFailure,
+								SPELL_LEVEL_REQ, level);
+						}
 					}
 					else {
 						Message_StringID(4, TARGET_NOT_FOUND);
@@ -2276,7 +2280,7 @@ bool Mob::SpellEffect(Mob* caster, uint16 spell_id, float partial, int level_ove
 			}
 
 			case SE_AETaunt:
-			{			
+			{
 #ifdef SPELL_EFFECT_SPAM
 				snprintf(effect_desc, _EDLEN, "AE Taunt");
 #endif
@@ -6704,24 +6708,24 @@ void Mob::ResourceTap(int32 damage, uint16 spellid)
 	for (int i = 0; i < EFFECT_COUNT; i++) {
 		if (spells[spellid].effectid[i] == SE_ResourceTap) {
 			damage = (damage * spells[spellid].base[i]) / 1000;
-			
+
 			if (damage) {
 				if (spells[spellid].max[i] && (damage > spells[spellid].max[i]))
 					damage = spells[spellid].max[i];
-	
+
 				if (spells[spellid].base2[i] == 0) { // HP Tap
 					if (damage > 0)
 						HealDamage(damage);
 					else
 						Damage(this, -damage, 0, EQEmu::skills::SkillEvocation, false);
 				}
-	
+
 				if (spells[spellid].base2[i] == 1) // Mana Tap
 					SetMana(GetMana() + damage);
-	
+
 				if (spells[spellid].base2[i] == 2 && IsClient()) // Endurance Tap
 					CastToClient()->SetEndurance(CastToClient()->GetEndurance() + damage);
-			
+
 			}
 		}
 	}
@@ -6898,7 +6902,7 @@ void Client::BreakFeignDeathWhenCastOn(bool IsResisted)
 			Message_StringID(MT_SpellFailure,FD_CAST_ON_NO_BREAK);
 			return;
 		}
-	
+
 		SetFeigned(false);
 		Message_StringID(MT_SpellFailure,FD_CAST_ON);
 	}
