@@ -18,6 +18,7 @@
 
 #include "../common/rulesys.h"
 #include "../common/string_util.h"
+#include "../common/server_stats.h"
 
 #include "client.h"
 #include "entity.h"
@@ -26,8 +27,6 @@
 #include "lua_parser.h"
 
 #include <string.h>
-
-extern double frame_time;
 
 int Mob::GetBaseSkillDamage(EQEmu::skills::SkillType skill, Mob *target)
 {
@@ -1033,7 +1032,7 @@ void Mob::ProjectileAttack()
 			ProjectileAtk[i].skill = 0;
 			ProjectileAtk[i].speed_mod = 0.0f;
 		} else {
-			ProjectileAtk[i].increment += 1000 * frame_time;
+			ProjectileAtk[i].increment += 1000 * EQ::ServerStats::Get().FrameTime();
 		}
 	}
 

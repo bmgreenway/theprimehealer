@@ -71,6 +71,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include "../common/event/timer.h"
 #include "../common/net/eqstream.h"
 #include "../common/net/servertalk_server.h"
+#include "../common/server_stats.h"
 
 #include <iostream>
 #include <string>
@@ -118,7 +119,6 @@ EQEmuLogSys LogSys;
 const SPDat_Spell_Struct* spells;
 int32 SPDAT_RECORDS = -1;
 const ZoneConfig *Config;
-double frame_time = 0.0;
 
 void Shutdown();
 extern void MapOpcodes();
@@ -466,16 +466,24 @@ int main(int argc, char** argv) {
 	std::chrono::time_point<std::chrono::system_clock> frame_prev = std::chrono::system_clock::now();
 	std::unique_ptr<EQ::Net::ConsoleServer> console;
 
-	auto loop_fn = [&](EQ::Timer* t) {
-		//Advance the timer to our current point in time
-		Timer::SetCurrentTime();
+	int sleep_time = 16;
+	while (RunLoops) {
+		auto now = std::chrono::high_resolution_clock::now();
 
-		/**
-		 * Calculate frame time
-		 */
-		std::chrono::time_point<std::chrono::system_clock> frame_now = std::chrono::system_clock::now();
-		frame_time = std::chrono::duration_cast<std::chrono::duration<double>>(frame_now - frame_prev).count();
-		frame_prev = frame_now;
+		EQ::ServerStats::Get().BeginFrame();
+		bool previous_loaded = is_zone_loaded && numclients > 0;
+		Timer::SetCurrentTime();
+		EQ::EventLoop::GetDefault().Process();
+		bool current_loaded = is_zone_loaded && numclients > 0;
+
+		if (previous_loaded && !current_loaded) {
+			sleep_time = 100;
+			eqsm->SetPriority(EQStreamPriority::Low);
+		}
+		else if (!previous_loaded && current_loaded) {
+			sleep_time = 16;
+			eqsm->SetPriority(EQStreamPriority::High);
+		}
 
 		/**
 		 * Telnet server
@@ -512,7 +520,7 @@ int main(int argc, char** argv) {
 
 			eqsm->OnNewConnection([&stream_identifier](std::shared_ptr<EQStreamInterface> stream) {
 				stream_identifier.AddStream(stream);
-				LogF(Logs::Detail, Logs::World_Server, "New connection from IP {0}:{1}", stream->GetRemoteIP(), ntohs(stream->GetRemotePort()));
+				LogF(Logs::Detail, Logs::World_Server, "New connection from IP {0}:{1}", stream->GetRemoteAddr(), ntohs(stream->GetRemotePort()));
 			});
 		}
 
@@ -581,33 +589,10 @@ int main(int argc, char** argv) {
 			database.ping();
 			entity_list.UpdateWho();
 		}
-	};
 
-	EQ::Timer process_timer(loop_fn);
-	process_timer.Start(1000, true);
-
-	while (RunLoops) {
-		bool previous_loaded = is_zone_loaded && numclients > 0;
-		EQ::EventLoop::GetDefault().Process();
-
-		bool current_loaded = is_zone_loaded && numclients > 0;
-		if (previous_loaded && !current_loaded) {
-			process_timer.Stop();
-			process_timer.Start(1000, true);
-			eqsm->SetPriority(EQStreamPriority::Low);
-		}
-		else if (!previous_loaded && current_loaded) {
-			process_timer.Stop();
-			process_timer.Start(32, true);
-			eqsm->SetPriority(EQStreamPriority::High);
-		}
-
-		if (current_loaded) {
-			Sleep(1);
-		}
-		else {
-			Sleep(10);
-		}
+		EQ::ServerStats::Get().EndFrame();
+		auto end = now + std::chrono::milliseconds(sleep_time);
+		std::this_thread::sleep_until(end);
 	}
 
 	entity_list.Clear();

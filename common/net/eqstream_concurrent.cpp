@@ -6,6 +6,7 @@
 #include "../opcodemgr.h"
 #include "../eqemu_logsys.h"
 #include "../eqemu_logsys_fmt.h"
+#include "../server_stats.h"
 #include "daybreak_connection.h"
 #include <thread>
 #include <concurrentqueue.h>
@@ -85,20 +86,27 @@ void EQ::Net::ConcurrentEQStreamManager::_BackgroundThread() {
 	_impl->background_update_stats_timer.reset(new EQ::Timer(&loop, 500, true,
 		std::bind(&ConcurrentEQStreamManager::_BackgroundUpdateStatsTimer, this, std::placeholders::_1)));
 
+	int sleep_time = 16;
 	while (true == _impl->background_running) {
+		auto now = std::chrono::high_resolution_clock::now();
+		EQ::ServerStats::Get().BeginNetworkFrame();
 		loop.Process();
 
 		switch (_impl->priority) {
 		case EQStreamPriority::Low:
-			Sleep(10);
+			sleep_time = 200;
 			break;
 		case EQStreamPriority::Normal:
-			Sleep(5);
+			sleep_time = 100;
 			break;
 		case EQStreamPriority::High:
-			Sleep(1);
+			sleep_time = 16;
 			break;
 		}
+
+		EQ::ServerStats::Get().EndNetworkFrame();
+		auto end = now + std::chrono::milliseconds(sleep_time);
+		std::this_thread::sleep_until(end);
 	}
 
 	_impl->background_loop_timer.release();

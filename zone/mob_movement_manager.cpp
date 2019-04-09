@@ -7,13 +7,13 @@
 #include "../common/eq_packet_structs.h"
 #include "../common/misc_functions.h"
 #include "../common/data_verification.h"
+#include "../common/server_stats.h"
 
 #include <vector>
 #include <deque>
 #include <map>
 #include <stdlib.h>
 
-extern double frame_time;
 extern Zone *zone;
 
 class IMovementCommand
@@ -69,7 +69,7 @@ public:
 			}
 		}
 		
-		auto td = rotate_to_speed * 19.0 * frame_time;
+		auto td = rotate_to_speed * 19.0 * EQ::ServerStats::Get().FrameTime();
 		
 		if (td >= dist) {
 			m->SetHeading(to);
@@ -186,7 +186,7 @@ public:
 
 		glm::vec2 dir = tar - pos;
 		glm::vec2 ndir = glm::normalize(dir);
-		double distance_moved = frame_time * current_speed * 0.4f * 1.45f;
+		double distance_moved = EQ::ServerStats::Get().FrameTime() * current_speed * 0.4f * 1.45f;
 
 		if (distance_moved > len) {		
 			if (m->IsNPC()) {
@@ -313,7 +313,7 @@ public:
 
 		glm::vec2 dir = tar - pos;
 		glm::vec2 ndir = glm::normalize(dir);
-		double distance_moved = frame_time * current_speed * 0.4f * 1.45f;
+		double distance_moved = EQ::ServerStats::Get().FrameTime() * current_speed * 0.4f * 1.45f;
 
 		if (distance_moved > len) {
 			if (m->IsNPC()) {

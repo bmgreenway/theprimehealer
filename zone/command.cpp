@@ -56,6 +56,7 @@
 #include "../common/eqemu_logsys.h"
 #include "../common/profanity_manager.h"
 #include "../common/net/eqstream.h"
+#include "../common/server_stats.h"
 
 #include "data_bucket.h"
 #include "command.h"
@@ -351,7 +352,7 @@ int command_init(void)
 		command_add("scribespells", "[max level] [min level] - Scribe all spells for you or your player target that are usable by them, up to level specified. (may freeze client for a few seconds)", 150, command_scribespells) ||
 		command_add("sendzonespawns", "- Refresh spawn list for all clients in zone", 150, command_sendzonespawns) ||
 		command_add("sensetrap",  "Analog for ldon sense trap for the newer clients since we still don't have it working.",  0, command_sensetrap) ||
-		command_add("serverinfo", "- Get OS info about server host", 200, command_serverinfo) ||
+		command_add("serverinfo", "- Various info about the current running instance.", 200, command_serverinfo) ||
 		command_add("serverrules", "- Read this server's rules", 0, command_serverrules) ||
 		command_add("setaapts", "[value] - Set your or your player target's available AA points", 100, command_setaapts) ||
 		command_add("setaaxp", "[value] - Set your or your player target's AA experience", 100, command_setaaxp) ||
@@ -841,22 +842,6 @@ void command_setanim(Client *c, const Seperator *sep)
 	else {
 		c->Message(0, "Usage: #setanim [animnum]");
 	}
-}
-
-void command_serverinfo(Client *c, const Seperator *sep)
-{
-#ifdef _WINDOWS
-	char intbuffer [sizeof(unsigned long)];
-	c->Message(0, "Operating system information.");
-	c->Message(0, "	%s",  Ver_name);
-	c->Message(0, "	Build number: %s",  ultoa(Ver_build, intbuffer, 10));
-	c->Message(0, "	Minor version: %s",  ultoa(Ver_min, intbuffer, 10));
-	c->Message(0, "	Major version: %s",  ultoa(Ver_maj, intbuffer, 10));
-	c->Message(0, "	Platform Id: %s",  ultoa(Ver_pid, intbuffer, 10));
-#else
-char buffer[255];
-	c->Message(0, "Operating system information: %s", GetOS(buffer));
-#endif
 }
 
 void command_getvariable(Client *c, const Seperator *sep)
@@ -12369,6 +12354,35 @@ void command_network(Client *c, const Seperator *sep)
 		c->Message(0, "getopt optname - Retrieve the current option value set.");
 		c->Message(0, "setopt optname - Set the current option allowed.");
 	}
+}
+
+void command_serverinfo(Client *c, const Seperator *sep)
+{
+	auto &stats = EQ::ServerStats::Get();
+	auto rusage = stats.ResourceUsage();
+	auto osn = stats.OSInfo();
+
+	c->Message(0, "------------------------------------------------");
+	c->Message(0, "Process");
+	c->Message(0, "------------------------------------------------");
+	c->Message(0, "PID: %u", stats.PID());
+	c->Message(0, "DEBUG: %s", stats.IsDebug() ? "ON" : "OFF");
+	c->Message(0, "%s (%s %s %s)", osn.version.c_str(), osn.system_name.c_str(), osn.release.c_str(), osn.machine.c_str());
+
+	c->Message(0, "------------------------------------------------");
+	c->Message(0, "CPU");
+	c->Message(0, "------------------------------------------------");
+	c->Message(0, "Usage: User %.2f sec, System %.2f sec", rusage.user_cpu_time, rusage.system_cpu_time);
+	c->Message(0, "Frame Time (Main): %.2f ms (active: %.2f ms) (inactive: %.2f ms) (%.2f fps)", 
+		stats.FrameTime() * 1000.0, 
+		stats.ActiveFrameTime() * 1000.0, 
+		stats.InactiveFrameTime() * 1000.0, 
+		1.0 / stats.FrameTime());
+	c->Message(0, "Frame Time (Network): %.2f ms (active: %.2f ms) (inactive: %.2f ms) (%.2f fps)",
+		stats.NetworkFrameTime() * 1000.0,
+		stats.NetworkActiveFrameTime() * 1000.0,
+		stats.NetworkInactiveFrameTime() * 1000.0,
+		1.0 / stats.NetworkFrameTime());
 }
 
 // All new code added to command.cpp should be BEFORE this comment line. Do no append code to this file below the BOTS code block.

@@ -195,6 +195,7 @@ SET(common_headers
 	say_link.h
 	seperator.h
 	serialize_buffer.h
+	server_stats.h
 	serverinfo.h
 	servertalk.h
 	shareddb.h
