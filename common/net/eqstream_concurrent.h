@@ -16,6 +16,7 @@ namespace EQ
 			ConcurrentEQStreamManager(const EQStreamManagerInterfaceOptions &options);
 			~ConcurrentEQStreamManager();
 
+			virtual void SetOptions(const EQStreamManagerInterfaceOptions& options);
 			virtual void OnNewConnection(std::function<void(std::shared_ptr<EQStreamInterface>)> func);
 			virtual void OnConnectionStateChange(std::function<void(std::shared_ptr<EQStreamInterface>, EQ::Net::DbProtocolStatus, EQ::Net::DbProtocolStatus)> func);
 			virtual void SetPriority(EQStreamPriority priority);

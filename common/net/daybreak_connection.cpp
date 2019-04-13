@@ -1085,9 +1085,16 @@ void EQ::Net::DaybreakConnection::ProcessResend(int stream)
 	}
 	
 	auto resends = 0;
+	auto max_resends = 20;
 	auto now = Clock::now();
 	auto s = &m_streams[stream];
 	for (auto &entry : s->sent_packets) {
+		resends++;
+
+		if (resends >= max_resends) {
+			return;
+		}
+
 		auto time_since_last_send = std::chrono::duration_cast<std::chrono::milliseconds>(now - entry.second.last_sent);
 		if (entry.second.times_resent == 0) {
 			if ((size_t)time_since_last_send.count() > entry.second.resend_delay) {
@@ -1105,7 +1112,12 @@ void EQ::Net::DaybreakConnection::ProcessResend(int stream)
 				}
 				m_stats.resent_packets++;
 
-				m_stats.resent_time_min = std::min(m_stats.resent_time_min, (uint64_t)time_since_last_send.count());
+				if (m_stats.resent_time_min == 0) {
+					m_stats.resent_time_min = (uint64_t)time_since_last_send.count();
+				}
+				else {
+					m_stats.resent_time_min = std::min(m_stats.resent_time_min, (uint64_t)time_since_last_send.count());
+				}
 				m_stats.resent_time_max = std::max(m_stats.resent_time_max, (uint64_t)time_since_last_send.count());
 				m_stats.resent_time_average = (m_stats.resent_time_average / 2) + (time_since_last_send.count() / 2);
 
@@ -1113,7 +1125,6 @@ void EQ::Net::DaybreakConnection::ProcessResend(int stream)
 				entry.second.last_sent = now;
 				entry.second.times_resent++;
 				entry.second.resend_delay = EQEmu::Clamp(entry.second.resend_delay * 2, m_owner->m_options.resend_delay_min, m_owner->m_options.resend_delay_max);
-				resends++;
 			}
 		}
 		else {
@@ -1138,7 +1149,12 @@ void EQ::Net::DaybreakConnection::ProcessResend(int stream)
 				}
 				m_stats.resent_packets++;
 
-				m_stats.resent_time_min = std::min(m_stats.resent_time_min, (uint64_t)time_since_last_send.count());
+				if (m_stats.resent_time_min == 0) {
+					m_stats.resent_time_min = (uint64_t)time_since_last_send.count();
+				}
+				else {
+					m_stats.resent_time_min = std::min(m_stats.resent_time_min, (uint64_t)time_since_last_send.count());
+				}
 				m_stats.resent_time_max = std::max(m_stats.resent_time_max, (uint64_t)time_since_last_send.count());
 				m_stats.resent_time_average = (m_stats.resent_time_average / 2) + (time_since_last_send.count() / 2);
 
@@ -1146,7 +1162,6 @@ void EQ::Net::DaybreakConnection::ProcessResend(int stream)
 				entry.second.last_sent = now;
 				entry.second.times_resent++;
 				entry.second.resend_delay = EQEmu::Clamp(entry.second.resend_delay * 2, m_owner->m_options.resend_delay_min, m_owner->m_options.resend_delay_max);
-				resends++;
 			}
 		}
 	}

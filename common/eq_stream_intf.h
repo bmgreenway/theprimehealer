@@ -63,8 +63,8 @@ public:
 	EQStreamManagerInterface(const EQStreamManagerInterfaceOptions &options) { m_options = options; }
 	virtual ~EQStreamManagerInterface() { };
 
-	const EQStreamManagerInterfaceOptions& GetOptions() const { return m_options; }
-	EQStreamManagerInterfaceOptions& MutateOptions() { return m_options; }
+	EQStreamManagerInterfaceOptions GetOptions() const { return m_options; }
+	virtual void SetOptions(const EQStreamManagerInterfaceOptions& options) = 0;
 
 	virtual void OnNewConnection(std::function<void(std::shared_ptr<EQStreamInterface>)> func) = 0;
 	virtual void OnConnectionStateChange(std::function<void(std::shared_ptr<EQStreamInterface>, EQ::Net::DbProtocolStatus, EQ::Net::DbProtocolStatus)> func) = 0;

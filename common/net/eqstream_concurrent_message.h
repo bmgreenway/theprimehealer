@@ -19,7 +19,8 @@ namespace EQ
 			TerminateBackground,
 			CloseConnection,
 			ResetStats,
-			SetPriority
+			SetPriority,
+			SetOptions
 		};
 
 		typedef struct  
@@ -91,5 +92,11 @@ namespace EQ
 			ceqs_msg_type type;
 			EQStreamPriority priority;
 		} ceqs_set_priority_msg_t;
+
+		typedef struct
+		{
+			ceqs_msg_type type;
+			DaybreakConnectionManagerOptions options;
+		} ceqs_set_options_msg_t;
 	}
 }

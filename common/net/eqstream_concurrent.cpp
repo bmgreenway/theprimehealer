@@ -29,6 +29,7 @@ struct EQ::Net::ConcurrentEQStreamManager::Impl
 	std::function<void(std::shared_ptr<EQStreamInterface>)> on_new_connection;
 	std::function<void(std::shared_ptr<EQStreamInterface>, EQ::Net::DbProtocolStatus, EQ::Net::DbProtocolStatus)> on_connection_state_change;
 	EQStreamPriority priority;
+	std::unique_ptr<DaybreakConnectionManager> dbcm;
 };
 
 EQ::Net::ConcurrentEQStreamManager::ConcurrentEQStreamManager(const EQStreamManagerInterfaceOptions &options)
@@ -75,10 +76,10 @@ void EQ::Net::ConcurrentEQStreamManager::_BackgroundThread() {
 	auto opts = eqs_opts.daybreak_options;
 	opts.loop = &loop;
 
-	std::unique_ptr<DaybreakConnectionManager> dbcm(new DaybreakConnectionManager(opts));
-	dbcm->OnNewConnection(std::bind(&ConcurrentEQStreamManager::DaybreakNewConnection, this, std::placeholders::_1));
-	dbcm->OnConnectionStateChange(std::bind(&ConcurrentEQStreamManager::DaybreakConnectionStateChange, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	dbcm->OnPacketRecv(std::bind(&ConcurrentEQStreamManager::DaybreakPacketRecv, this, std::placeholders::_1, std::placeholders::_2));
+	_impl->dbcm.reset(new DaybreakConnectionManager(opts));
+	_impl->dbcm->OnNewConnection(std::bind(&ConcurrentEQStreamManager::DaybreakNewConnection, this, std::placeholders::_1));
+	_impl->dbcm->OnConnectionStateChange(std::bind(&ConcurrentEQStreamManager::DaybreakConnectionStateChange, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	_impl->dbcm->OnPacketRecv(std::bind(&ConcurrentEQStreamManager::DaybreakPacketRecv, this, std::placeholders::_1, std::placeholders::_2));
 
 	_impl->background_loop_timer.reset(new EQ::Timer(&loop, 16, true,
 		std::bind(&ConcurrentEQStreamManager::_BackgroundTimer, this, std::placeholders::_1)));
@@ -111,7 +112,7 @@ void EQ::Net::ConcurrentEQStreamManager::_BackgroundThread() {
 
 	_impl->background_loop_timer.release();
 	_impl->background_update_stats_timer.release();
-	dbcm.release();
+	_impl->dbcm.release();
 
 	ceqs_msg_t eqs_msg;
 	while (_impl->background_queue.try_dequeue(eqs_msg)) {
@@ -204,6 +205,13 @@ void EQ::Net::ConcurrentEQStreamManager::_ProcessBackgroundMessage(const ceqs_ms
 		_impl->priority = msg_in->priority;
 		break;
 	}
+	case ceqs_msg_type::SetOptions:
+	{
+		ceqs_set_options_msg_t *msg_in = (ceqs_set_options_msg_t*)&msg;
+		auto &opts = _impl->dbcm->GetOptions();
+		opts = msg_in->options;
+		break;
+	}
 	default:
 		break;
 	}
@@ -288,6 +296,17 @@ void EQ::Net::ConcurrentEQStreamManager::_PushToBackgroundQueue(ceqs_msg_t *msg)
 void EQ::Net::ConcurrentEQStreamManager::_PushToForegroundQueue(ceqs_msg_t *msg)
 {
 	_impl->foreground_queue.enqueue(*msg);
+}
+
+//Called by foreground
+void EQ::Net::ConcurrentEQStreamManager::SetOptions(const EQStreamManagerInterfaceOptions &options)
+{
+	m_options = options;
+
+	ceqs_set_options_msg_t msg;
+	msg.type = ceqs_msg_type::SetOptions;
+	msg.options = options.daybreak_options;
+	_PushToBackgroundQueue((ceqs_msg_t*)&msg);
 }
 
 //Called by foreground

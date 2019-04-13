@@ -19,6 +19,7 @@ namespace EQ
 			EQStreamManager(const EQStreamManagerInterfaceOptions &options);
 			~EQStreamManager();
 
+			virtual void SetOptions(const EQStreamManagerInterfaceOptions& options) { m_options = options; }
 			virtual void OnNewConnection(std::function<void(std::shared_ptr<EQStreamInterface>)> func) { m_on_new_connection = func; }
 			virtual void OnConnectionStateChange(std::function<void(std::shared_ptr<EQStreamInterface>, EQ::Net::DbProtocolStatus, EQ::Net::DbProtocolStatus)> func) { m_on_connection_state_change = func; }
 			virtual void SetPriority(EQStreamPriority priority) { }
