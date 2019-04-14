@@ -845,18 +845,45 @@ void command_setanim(Client *c, const Seperator *sep)
 
 void command_serverinfo(Client *c, const Seperator *sep)
 {
-#ifdef _WINDOWS
-	char intbuffer [sizeof(unsigned long)];
-	c->Message(0, "Operating system information.");
-	c->Message(0, "	%s",  Ver_name);
-	c->Message(0, "	Build number: %s",  ultoa(Ver_build, intbuffer, 10));
-	c->Message(0, "	Minor version: %s",  ultoa(Ver_min, intbuffer, 10));
-	c->Message(0, "	Major version: %s",  ultoa(Ver_maj, intbuffer, 10));
-	c->Message(0, "	Platform Id: %s",  ultoa(Ver_pid, intbuffer, 10));
-#else
-char buffer[255];
-	c->Message(0, "Operating system information: %s", GetOS(buffer));
-#endif
+	auto os = EQ::GetOS();
+	auto cpus = EQ::GetCPUs();
+	auto pid = EQ::GetPID();
+	auto rss = EQ::GetRSS();
+	auto uptime = EQ::GetUptime();
+
+	c->Message(0, "Operating System Information");
+	c->Message(0, "==================================================");
+	c->Message(0, "System: %s", os.sysname.c_str());
+	c->Message(0, "Release: %s", os.release.c_str());
+	c->Message(0, "Version: %s", os.version.c_str());
+	c->Message(0, "Machine: %s", os.machine.c_str());
+	c->Message(0, "Uptime: %.2f seconds", uptime);
+	c->Message(0, "==================================================");
+	c->Message(0, "CPU Information");
+	c->Message(0, "==================================================");
+	for (size_t i = 0; i < cpus.size(); ++i) {
+		auto &cp = cpus[i];
+		c->Message(0, "CPU #%i: %s @ %.2fGhz", i, cp.model.c_str(), cp.speed);
+	}
+	c->Message(0, "==================================================");
+	c->Message(0, "Process Information");
+	c->Message(0, "==================================================");
+	c->Message(0, "PID: %u", pid);
+	c->Message(0, "RSS: %.2f MB", rss / 1048576.0);
+	c->Message(0, "==================================================");
+
+//#ifdef _WINDOWS
+//	char intbuffer [sizeof(unsigned long)];
+//	c->Message(0, "Operating system information.");
+//	c->Message(0, "	%s",  Ver_name);
+//	c->Message(0, "	Build number: %s",  ultoa(Ver_build, intbuffer, 10));
+//	c->Message(0, "	Minor version: %s",  ultoa(Ver_min, intbuffer, 10));
+//	c->Message(0, "	Major version: %s",  ultoa(Ver_maj, intbuffer, 10));
+//	c->Message(0, "	Platform Id: %s",  ultoa(Ver_pid, intbuffer, 10));
+//#else
+//char buffer[255];
+//	c->Message(0, "Operating system information: %s", GetOS(buffer));
+//#endif
 }
 
 void command_getvariable(Client *c, const Seperator *sep)
@@ -12234,8 +12261,8 @@ void command_network(Client *c, const Seperator *sep)
 			c->Message(0, "simulated_out_packet_loss: %u", opts.daybreak_options.simulated_out_packet_loss);
 			c->Message(0, "tic_rate_hertz: %.2f", opts.daybreak_options.tic_rate_hertz);
 			c->Message(0, "connection_close_time: %u", opts.daybreak_options.connection_close_time);
-			c->Message(0, "max_outstanding_resends: %u", opts.daybreak_options.connection_close_time);
-			c->Message(0, "resends_before_disconnect: %u", opts.daybreak_options.connection_close_time);
+			c->Message(0, "max_outstanding_resends: %u", opts.daybreak_options.max_outstanding_resends);
+			c->Message(0, "resends_before_disconnect: %u", opts.daybreak_options.resends_before_disconnect);
 			c->Message(0, "encode_passes[0]: %u", opts.daybreak_options.encode_passes[0]);
 			c->Message(0, "encode_passes[1]: %u", opts.daybreak_options.encode_passes[1]);
 			c->Message(0, "port: %i", opts.daybreak_options.port);
