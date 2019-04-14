@@ -503,7 +503,11 @@ int main(int argc, char** argv) {
 	opts.daybreak_options.resend_delay_factor = RuleR(Network, ResendDelayFactor);
 	opts.daybreak_options.resend_delay_min = RuleI(Network, ResendDelayMinMS);
 	opts.daybreak_options.resend_delay_max = RuleI(Network, ResendDelayMaxMS);
-	opts.daybreak_options.outgoing_data_rate = RuleR(Network, ClientDataRate);
+	opts.daybreak_options.max_outstanding_resends = RuleI(Network, MaxOutstandingResends);
+	opts.daybreak_options.resends_before_disconnect = RuleI(Network, MaxResendsBeforeDisconnect);
+	opts.daybreak_options.hold_size = RuleI(Network, HoldSizeBytes);
+	opts.daybreak_options.hold_length_ms = RuleI(Network, HoldTimeMS);
+	opts.daybreak_options.tic_rate_hertz = RuleR(Network, TicRateHz);
 
 	EQ::Net::EQStreamManager eqsm(opts);
 

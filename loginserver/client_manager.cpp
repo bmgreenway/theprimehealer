@@ -46,6 +46,7 @@ ClientManager::ClientManager()
 
 	int sod_port = atoi(server.config->GetVariable("SoD", "port").c_str());
 	EQStreamManagerInterfaceOptions sod_opts(sod_port, false, false);
+
 	sod_stream = new EQ::Net::EQStreamManager(sod_opts);
 	sod_ops = new RegularOpcodeManager;
 	if (!sod_ops->LoadOpcodes(server.config->GetVariable("SoD", "opcodes").c_str()))

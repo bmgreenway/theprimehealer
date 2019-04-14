@@ -474,6 +474,11 @@ Clientlist::Clientlist(int ChatPort) {
 	chat_opts.daybreak_options.resend_delay_factor = RuleR(Network, ResendDelayFactor);
 	chat_opts.daybreak_options.resend_delay_min = RuleI(Network, ResendDelayMinMS);
 	chat_opts.daybreak_options.resend_delay_max = RuleI(Network, ResendDelayMaxMS);
+	chat_opts.daybreak_options.max_outstanding_resends = RuleI(Network, MaxOutstandingResends);
+	chat_opts.daybreak_options.resends_before_disconnect = RuleI(Network, MaxResendsBeforeDisconnect);
+	chat_opts.daybreak_options.hold_size = RuleI(Network, HoldSizeBytes);
+	chat_opts.daybreak_options.hold_length_ms = RuleI(Network, HoldTimeMS);
+	chat_opts.daybreak_options.tic_rate_hertz = RuleR(Network, TicRateHz);
 
 	chatsf = new EQ::Net::EQStreamManager(chat_opts);
 

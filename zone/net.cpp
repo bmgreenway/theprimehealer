@@ -500,13 +500,17 @@ int main(int argc, char** argv) {
 		if (!eqsf_open && Config->ZonePort != 0) {
 			Log(Logs::General, Logs::Zone_Server, "Starting EQ Network server on port %d", Config->ZonePort);
 
-			EQStreamManagerInterfaceOptions opts(Config->ZonePort, false, true);
+			EQStreamManagerInterfaceOptions opts(Config->ZonePort, false, RuleB(Network, CompressZoneStream));
 			opts.daybreak_options.resend_delay_ms = RuleI(Network, ResendDelayBaseMS);
 			opts.daybreak_options.resend_delay_factor = RuleR(Network, ResendDelayFactor);
 			opts.daybreak_options.resend_delay_min = RuleI(Network, ResendDelayMinMS);
 			opts.daybreak_options.resend_delay_max = RuleI(Network, ResendDelayMaxMS);
-			opts.daybreak_options.outgoing_data_rate = RuleR(Network, ClientDataRate);
-			opts.track_opcode_stats = RuleB(Network, TrackOpcodeStats);
+			opts.daybreak_options.max_outstanding_resends = RuleI(Network, MaxOutstandingResends);
+			opts.daybreak_options.resends_before_disconnect = RuleI(Network, MaxResendsBeforeDisconnect);
+			opts.daybreak_options.hold_size = RuleI(Network, HoldSizeBytes);
+			opts.daybreak_options.hold_length_ms = RuleI(Network, HoldTimeMS);
+			opts.daybreak_options.tic_rate_hertz = RuleR(Network, TicRateHz);
+
 			eqsm.reset(new EQ::Net::EQStreamManager(opts));
 			eqsf_open = true;
 

@@ -86,11 +86,21 @@ namespace EQ
 				max_ping = 0;
 				avg_ping = 0;
 				created = Clock::now();
-				dropped_datarate_packets = 0;
 				resent_packets = 0;
 				resent_fragments = 0;
 				resent_full = 0;
-				datarate_remaining = 0.0;
+			}
+
+			void Reset() {
+				recv_bytes = 0;
+				sent_bytes = 0;
+				min_ping = 0xFFFFFFFFFFFFFFFFUL;
+				max_ping = 0;
+				avg_ping = 0;
+				created = Clock::now();
+				resent_packets = 0;
+				resent_fragments = 0;
+				resent_full = 0;
 			}
 
 			uint64_t recv_bytes;
@@ -106,15 +116,12 @@ namespace EQ
 			uint64_t avg_ping;
 			uint64_t last_ping;
 			Timestamp created;
-			uint64_t dropped_datarate_packets; //packets dropped due to datarate limit, couldn't think of a great name
 			uint64_t resent_packets;
 			uint64_t resent_fragments;
 			uint64_t resent_full;
-			double datarate_remaining;
 		};
 
 		class DaybreakConnectionManager;
-		class DaybreakConnection;
 		class DaybreakConnection
 		{
 		public:
@@ -132,10 +139,8 @@ namespace EQ
 
 			DaybreakConnectionStats GetStats();
 			void ResetStats();
-			size_t GetRollingPing() const { return m_rolling_ping; }
 			DbProtocolStatus GetStatus() const { return m_status; }
 
-			const DaybreakEncodeType* GetEncodePasses() const { return m_encode_passes; }
 			const DaybreakConnectionManager* GetManager() const { return m_owner; }
 			DaybreakConnectionManager* GetManager() { return m_owner; }
 		private:
@@ -159,7 +164,6 @@ namespace EQ
 			Timestamp m_last_session_stats;
 			size_t m_rolling_ping;
 			Timestamp m_close_time;
-			double m_outgoing_budget;
 
 			struct DaybreakSentPacket
 			{
@@ -249,9 +253,9 @@ namespace EQ
 				simulated_in_packet_loss = 0;
 				simulated_out_packet_loss = 0;
 				tic_rate_hertz = 60.0;
-				resend_timeout = 90000;
 				connection_close_time = 2000;
-				outgoing_data_rate = 0.0;
+				max_outstanding_resends = 5;
+				resends_before_disconnect = 5;
 			}
 
 			size_t max_packet_size;
@@ -269,12 +273,12 @@ namespace EQ
 			size_t hold_length_ms;
 			size_t simulated_in_packet_loss;
 			size_t simulated_out_packet_loss;
+			size_t max_outstanding_resends;
+			size_t resends_before_disconnect;
 			double tic_rate_hertz;
-			size_t resend_timeout;
 			size_t connection_close_time;
 			DaybreakEncodeType encode_passes[2];
 			int port;
-			double outgoing_data_rate;
 		};
 
 		class DaybreakConnectionManager
