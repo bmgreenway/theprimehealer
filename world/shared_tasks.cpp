@@ -6,6 +6,7 @@
 #include "zonelist.h"
 
 #include <algorithm>
+#include <fmt/format.h>
 
 extern ClientList client_list;
 extern ZSList zoneserver_list;
@@ -153,6 +154,7 @@ void SharedTaskManager::HandleTaskRequest(ServerPacket *pack)
 	// this will also prevent any of these clients from requesting or being added to another, lets do it now before we tell zone
 	task.SetCLESharedTasks();
 	task.InitActivities();
+	task.SetUpdated();
 	// fire off to zone we're done!
 	SerializeBuffer buf(10 + 10 * players.size());
 	buf.WriteInt32(id);				// shared task's ID
@@ -194,7 +196,7 @@ void SharedTaskManager::HandleTaskZoneCreated(ServerPacket *pack)
 	auto stm = (ServerSharedTaskMember_Struct *)outpack->pBuffer;
 	stm->id = id;
 
-	for (auto &&m : task->members) {
+	for (auto &&m : task->members.list) {
 		if (m.leader) // leader done!
 			continue;
 
@@ -465,10 +467,10 @@ void SharedTaskManager::Process()
 
 void SharedTask::MemberLeftGame(ClientListEntry *cle)
 {
-	auto it = std::find_if(members.begin(), members.end(), [cle](SharedTaskMember &m) { return m.cle == cle; });
+	auto it = std::find_if(members.list.begin(), members.list.end(), [cle](SharedTaskMember &m) { return m.cle == cle; });
 
 	// ahh okay ...
-	if (it == members.end())
+	if (it == members.list.end())
 		return;
 
 	it->cle = nullptr;
@@ -482,9 +484,9 @@ void SharedTask::MemberLeftGame(ClientListEntry *cle)
  */
 void SharedTask::SerializeMembers(SerializeBuffer &buf, bool include_leader) const
 {
-	buf.WriteInt32(include_leader ? members.size() : members.size() - 1);
+	buf.WriteInt32(include_leader ? members.list.size() : members.list.size() - 1);
 
-	for (auto && m : members) {
+	for (auto && m : members.list) {
 		if (!include_leader && m.leader)
 			continue;
 
@@ -498,7 +500,7 @@ void SharedTask::SerializeMembers(SerializeBuffer &buf, bool include_leader) con
  */
 void SharedTask::SetCLESharedTasks()
 {
-	for (auto &&m : members) {
+	for (auto &&m : members.list) {
 		if (m.cle == nullptr) // shouldn't happen ....
 			continue;
 
@@ -507,8 +509,80 @@ void SharedTask::SetCLESharedTasks()
 	}
 }
 
-void SharedTask::Save() const
+void SharedTask::Save()
 {
+	const char *ERR_MYSQLERROR = "[TASKS]Error in TaskManager::SaveClientState %s";
+	database.TransactionBegin();
+	std::string query; // simple queries
+	fmt::MemoryWriter out; // queries where we loop over stuff
+
+	if (task_state.Updated) {
+		query = fmt::format(
+		    "REPLACE INTO shared_task_state (id, task_id, accepted_time, is_locked) VALUES ({}, {}, {}, {:d})",
+		    id, task_id, GetAcceptedTime(), locked);
+		auto res = database.QueryDatabase(query);
+		if (!res.Success())
+			Log(Logs::General, Logs::Error, ERR_MYSQLERROR, res.ErrorMessage().c_str());
+		else
+			task_state.Updated = false;
+	}
+
+	int activity_count = 0;
+	int max = shared_tasks.GetTaskActivityCount(task_id);
+	out.write("REPLACE INTO shared_task_activities (shared_task_id, activity_id, done_count, completed) VALUES ");
+	for (int i = 0; i < max; ++i) {
+		if (!task_state.Activity[i].Updated)
+			continue;
+
+		if (activity_count == 0)
+			out.write("({}, {}, {}, {})", id, i, task_state.Activity[i].DoneCount,
+				  task_state.Activity[i].State == ActivityCompleted);
+		else
+			out.write(", ({}, {}, {}, {})", id, i, task_state.Activity[i].DoneCount,
+				  task_state.Activity[i].State == ActivityCompleted);
+		++activity_count;
+	}
+
+	// we got stuff to write
+	if (activity_count != 0) {
+		query = out.str();
+		out.clear();
+		auto res = database.QueryDatabase(query);
+		if (!res.Success()) {
+			Log(Logs::General, Logs::Error, ERR_MYSQLERROR, res.ErrorMessage().c_str());
+		} else {
+			for (int i = 0; i < max; ++i)
+				task_state.Activity[i].Updated = false;
+		}
+	}
+
+	if (members.update) {
+		query = fmt::format("DELETE FROM `shared_task_members` WHERE `shared_task_id` = {}", id);
+		database.QueryDatabase(query);
+
+		out.write("INSERT INTO `shared_task_members` (shared_task_id, character_id, character_name, is_leader) "
+			  "VALUES ");
+		bool first = true;
+		for (auto &&m : members.list) {
+			if (first) {
+				out.write("({}, {}, {}, {:d})", id, m.char_id, m.name, m.leader);
+				first = false;
+			} else {
+				out.write(", ({}, {}, {}, {:d})", id, m.char_id, m.name, m.leader);
+			}
+		}
+		query = out.str();
+		out.clear();
+		auto res = database.QueryDatabase(query);
+		if (!res.Success())
+			Log(Logs::General, Logs::Error, ERR_MYSQLERROR, res.ErrorMessage().c_str());
+		else
+			members.update = false;
+	}
+
+	database.TransactionCommit();
+
+	// TODO: zone does some shit about completed tasks, is this for task history? Can we make zone do this?
 }
 
 /*

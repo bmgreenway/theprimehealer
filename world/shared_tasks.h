@@ -23,6 +23,12 @@ struct SharedTaskMember {
 	}
 };
 
+struct SharedTaskMemberList {
+	bool update; // dirty flag
+	std::vector<SharedTaskMember> list;
+	SharedTaskMemberList() : update(true) {}
+};
+
 class SharedTask {
 public:
 	SharedTask() : id(0), task_id(0), locked(false) {}
@@ -31,7 +37,8 @@ public:
 
 	void AddMember(std::string name, ClientListEntry *cle = nullptr, int char_id = 0, bool leader = false)
 	{
-		members.push_back({name, cle, char_id, leader});
+		members.update = true;
+		members.list.push_back({name, cle, char_id, leader});
 		if (leader)
 			leader_name = name;
 		if (char_id == 0)
@@ -43,8 +50,8 @@ public:
 	void MemberLeftGame(ClientListEntry *cle);
 	inline const std::string &GetLeaderName() const { return leader_name; }
 	inline SharedTaskMember *GetLeader() {
-		auto it = std::find_if(members.begin(), members.end(), [](const SharedTaskMember &m) { return m.leader; });
-		if (it != members.end())
+		auto it = std::find_if(members.list.begin(), members.list.end(), [](const SharedTaskMember &m) { return m.leader; });
+		if (it != members.list.end())
 			return &(*it);
 		else
 			return nullptr;
@@ -54,8 +61,9 @@ public:
 	void SetCLESharedTasks();
 	void InitActivities();
 	bool UnlockActivities();
+	inline void SetUpdated(bool in = true) { task_state.Updated = in; }
 
-	void Save() const; // save to database
+	void Save(); // save to database
 
 private:
 	inline void SetID(int in) { id = in; }
@@ -68,7 +76,7 @@ private:
 	int task_id; // ID of the task we're on
 	bool locked;
 	std::string leader_name;
-	std::vector<SharedTaskMember> members;
+	SharedTaskMemberList members;
 	std::vector<int> char_ids; // every char id of someone to be locked out, different in case they leave/removed
 	ClientTaskInformation task_state; // book keeping
 
