@@ -535,10 +535,10 @@ void SharedTask::Save()
 			continue;
 
 		if (activity_count == 0)
-			out.write("({}, {}, {}, {})", id, i, task_state.Activity[i].DoneCount,
+			out.write("({}, {}, {}, {:d})", id, i, task_state.Activity[i].DoneCount,
 				  task_state.Activity[i].State == ActivityCompleted);
 		else
-			out.write(", ({}, {}, {}, {})", id, i, task_state.Activity[i].DoneCount,
+			out.write(", ({}, {}, {}, {:d})", id, i, task_state.Activity[i].DoneCount,
 				  task_state.Activity[i].State == ActivityCompleted);
 		++activity_count;
 	}
@@ -565,10 +565,10 @@ void SharedTask::Save()
 		bool first = true;
 		for (auto &&m : members.list) {
 			if (first) {
-				out.write("({}, {}, {}, {:d})", id, m.char_id, m.name, m.leader);
+				out.write("({}, {}, \"{}\", {:d})", id, m.char_id, m.name, m.leader);
 				first = false;
 			} else {
-				out.write(", ({}, {}, {}, {:d})", id, m.char_id, m.name, m.leader);
+				out.write(", ({}, {}, \"{}\", {:d})", id, m.char_id, m.name, m.leader);
 			}
 		}
 		query = out.str();
