@@ -65,6 +65,7 @@ public:
 
 	void Save(); // save to database
 
+	friend class SharedTaskManager;
 private:
 	inline void SetID(int in) { id = in; }
 	inline void SetTaskID(int in) { task_id = in; }

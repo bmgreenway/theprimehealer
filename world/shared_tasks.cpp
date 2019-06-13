@@ -402,6 +402,26 @@ bool SharedTaskManager::LoadSharedTaskState()
 		}
 	}
 
+	query = "SELECT `shared_task_id`, `activity_id`, `done_count`, `completed` FROM `shared_task_activities` ORDER BY shared_task_id ASC";
+	results = database.QueryDatabase(query);
+	if (results.Success() && results.RowCount() > 0) {
+		for (auto row = results.begin(); row != results.end(); ++row) {
+			int task_id = atoi(row[0]);
+			// hmm not sure best way to do this, fine for now
+			if (tasks.count(task_id) == 1) {
+				int index = atoi(row[1]);
+				auto &task = tasks[task_id];
+				task.task_state.Activity[index].DoneCount = atoi(row[2]);
+				if (atoi(row[3]) != 0)
+					task.task_state.Activity[index].State = ActivityCompleted;
+				else
+					task.task_state.Activity[index].State = ActivityHidden;
+			}
+		}
+	}
+
+	// TODO we need to call UnlockActivities on all the tasks ....
+
 	// Load existing tasks. We may not want to actually do this here and wait for a client to log in
 	// But the crash case may actually dictate we should :P
 
