@@ -753,11 +753,11 @@ bool TaskManager::LoadClientState(Client *c, ClientTaskState *state)
 	}
 
 	if (state->ActiveTask.TaskID != TASKSLOTEMPTY)
-		state->UnlockActivities(characterID, state->ActiveTask);
+		state->UnlockActivities(state->ActiveTask);
 	// TODO: shared
 	for (int i = 0; i < MAXACTIVEQUESTS; i++)
 		if (state->ActiveQuests[i].TaskID != TASKSLOTEMPTY)
-			state->UnlockActivities(characterID, state->ActiveQuests[i]);
+			state->UnlockActivities(state->ActiveQuests[i]);
 
 	Log(Logs::General, Logs::Tasks, "[CLIENTLOAD] LoadClientState for Character ID %d DONE!", characterID);
 	return true;
@@ -1378,11 +1378,11 @@ static void DeleteCompletedTaskFromDatabase(int charID, int taskID) {
 	Log(Logs::General, Logs::Tasks, "[UPDATE] Delete query %s", query.c_str());
 }
 
-bool ClientTaskState::UnlockActivities(int CharID, ClientTaskInformation &task_info)
+bool ClientTaskState::UnlockActivities(ClientTaskInformation &task_info)
 {
 	bool AllActivitiesComplete = true;
 
-	TaskInformation* Task = taskmanager->Tasks[task_info.TaskID];
+	TaskInformation *Task = taskmanager->Tasks[task_info.TaskID];
 
 	if (Task == nullptr)
 		return true;
@@ -1390,8 +1390,7 @@ bool ClientTaskState::UnlockActivities(int CharID, ClientTaskInformation &task_i
 	// On loading the client state, all activities that are not completed, are
 	// marked as hidden. For Sequential (non-stepped) mode, we mark the first
 	// activity as active if not complete.
-	Log(Logs::General, Logs::Tasks, "[UPDATE] CharID: %i Task: %i Sequence mode is %i",
-				CharID, task_info.TaskID, Task->SequenceMode);
+	Log(Logs::General, Logs::Tasks, "[UPDATE] Task: %i Sequence mode is %i", task_info.TaskID, Task->SequenceMode);
 
 	if (Task->SequenceMode == ActivitiesSequential) {
 		if (task_info.Activity[0].State != ActivityCompleted)
@@ -1399,8 +1398,7 @@ bool ClientTaskState::UnlockActivities(int CharID, ClientTaskInformation &task_i
 
 		// Enable the next Hidden task.
 		for (int i = 0; i < Task->ActivityCount; i++) {
-			if ((task_info.Activity[i].State == ActivityActive) &&
-			    (!Task->Activity[i].Optional)) {
+			if (task_info.Activity[i].State == ActivityActive && !Task->Activity[i].Optional) {
 				AllActivitiesComplete = false;
 				break;
 			}
@@ -1411,7 +1409,6 @@ bool ClientTaskState::UnlockActivities(int CharID, ClientTaskInformation &task_i
 				break;
 			}
 		}
-
 
 		Log(Logs::General, Logs::Tasks, "[UPDATE] Returning sequential task, AllActivitiesComplete is %i",
 		    AllActivitiesComplete);
@@ -1442,8 +1439,8 @@ bool ClientTaskState::UnlockActivities(int CharID, ClientTaskInformation &task_i
 	for (int Step = task_info.CurrentStep; Step <= Task->LastStep; Step++) {
 		for (int Activity = 0; Activity < Task->ActivityCount; Activity++) {
 			if (Task->Activity[Activity].StepNumber == (int)task_info.CurrentStep) {
-				if ((task_info.Activity[Activity].State != ActivityCompleted) &&
-				    (!Task->Activity[Activity].Optional)) {
+				if (task_info.Activity[Activity].State != ActivityCompleted &&
+				    !Task->Activity[Activity].Optional) {
 					CurrentStepComplete = false;
 					AllActivitiesComplete = false;
 					break;
@@ -1455,15 +1452,13 @@ bool ClientTaskState::UnlockActivities(int CharID, ClientTaskInformation &task_i
 		task_info.CurrentStep++;
 	}
 
-	if (AllActivitiesComplete) {
+	if (AllActivitiesComplete)
 		return true;
-	}
 
 	// Mark all non-completed tasks in the current step as active
-	//
 	for (int Activity = 0; Activity < Task->ActivityCount; Activity++) {
-		if ((Task->Activity[Activity].StepNumber == (int)task_info.CurrentStep) &&
-		    (task_info.Activity[Activity].State == ActivityHidden)) {
+		if (Task->Activity[Activity].StepNumber == (int)task_info.CurrentStep &&
+		    task_info.Activity[Activity].State == ActivityHidden) {
 			task_info.Activity[Activity].State = ActivityActive;
 			task_info.Activity[Activity].Updated = true;
 		}
@@ -1950,7 +1945,7 @@ void ClientTaskState::IncrementDoneCount(Client *c, TaskInformation *Task, int T
 		// Flag the activity as complete
 		info->Activity[ActivityID].State = ActivityCompleted;
 		// Unlock subsequent activities for this task
-		bool TaskComplete = UnlockActivities(c->CharacterID(), *info);
+		bool TaskComplete = UnlockActivities(*info);
 		if (TaskComplete)
 			RecordCompletedTasks(c->CharacterID(), *info);
 		Log(Logs::General, Logs::Tasks, "[UPDATE] TaskCompleted is %i", TaskComplete);
@@ -3347,7 +3342,7 @@ void ClientTaskState::AcceptNewTask(Client *c, int TaskID, int NPCID, bool enfor
 		active_slot->Activity[i].Updated = true;
 	}
 
-	UnlockActivities(c->CharacterID(), *active_slot);
+	UnlockActivities(*active_slot);
 
 	if (task->type == TaskType::Quest)
 		ActiveTaskCount++;
@@ -3499,7 +3494,7 @@ void ClientTaskState::AcceptNewSharedTask(Client *c, int TaskID, int NPCID, int 
 
 	// TODO: figure out packet order
 	// unsure if we unlock now packet wise, just copying normal tasks for now
-	UnlockActivities(c->CharacterID(), *task_activity);
+	UnlockActivities(*task_activity);
 
 	taskmanager->SendSingleActiveTaskToClient(c, *task_activity, false, true);
 	c->Message(0, "You have been assigned the task '%s'.", taskmanager->Tasks[TaskID]->Title.c_str());

@@ -190,7 +190,7 @@ public:
 	friend class TaskManager;
 
 private:
-	bool UnlockActivities(int CharID, ClientTaskInformation &task_info);
+	bool UnlockActivities(ClientTaskInformation &task_info);
 	void RecordCompletedTasks(int char_id, ClientTaskInformation &task_info);
 	void IncrementDoneCount(Client *c, TaskInformation *Task, int TaskIndex, int ActivityID, int Count = 1, bool ignore_quest_update = false);
 	inline ClientTaskInformation *GetClientTaskInfo(TaskType type, int index)
