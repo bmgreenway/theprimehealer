@@ -3482,8 +3482,8 @@ void ClientTaskState::RequestSharedTask(Client *c, int TaskID, int NPCID, bool e
 			if (group->members[i] == c) // skipping requestor
 				continue;
 
-			// TODO: mercs/bots
-			if (group->members[i] != nullptr && group->members[i]->IsClient())
+			// TODO: mercs/bots ahh this will just break in world for now :D
+			if (group->membername[0] != '\0')
 				buf.WriteString(group->membername[i]);
 		}
 	} else if (raid) {
