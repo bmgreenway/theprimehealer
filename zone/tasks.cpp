@@ -3078,12 +3078,32 @@ SharedTaskState *TaskManager::LoadSharedTask(int id, ClientTaskState *state)
 
 	task_state->SetLocked(atoi(row[2]) != 0);
 
-	for (int i = 0; i < taskmanager->Tasks[task_id]->ActivityCount; i++) {
-		task_activity->Activity[i].ActivityID = i;
-		task_activity->Activity[i].DoneCount = 0;
-		task_activity->Activity[i].State = ActivityHidden;
-		task_activity->Activity[i].Updated = true;
+	query = fmt::format("SELECT activity_id, done_count, completed FROM shared_task_activities WHERE shared_task_id = {}", id);
+	results = database.QueryDatabase(query);
+	if (!results.Success()) {
+		// hmmm
+		return nullptr;
 	}
+
+	for (auto row = results.begin(); row != results.end(); ++row) {
+		int index = atoi(row[0]);
+		task_activity->Activity[index].ActivityID = index;
+		task_activity->Activity[index].DoneCount = atoi(row[1]);
+		if (atoi(row[2]) != 0)
+			task_activity->Activity[index].State = ActivityCompleted;
+		else
+			task_activity->Activity[index].State = ActivityHidden
+	}
+
+	query = fmt::format("SELECT character_name, is_leader FROM shared_task_members WHERE shared_task_id = {}", id);
+	results = database.QueryDatabase(query);
+	if (!results.Success()) {
+		// hmmm
+		return nullptr;
+	}
+
+	for (auto row = results.begin(); row != results.end(); ++row)
+		task_state->AddMember(row[0], nullptr, atoi(row[1]) != 0);
 
 	state->UnlockActivities(*task_activity);
 

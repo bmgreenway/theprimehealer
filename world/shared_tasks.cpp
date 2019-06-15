@@ -411,6 +411,7 @@ bool SharedTaskManager::LoadSharedTaskState()
 			if (tasks.count(task_id) == 1) {
 				int index = atoi(row[1]);
 				auto &task = tasks[task_id];
+				task.task_state.Activity[index].ActivityID = index;
 				task.task_state.Activity[index].DoneCount = atoi(row[2]);
 				if (atoi(row[3]) != 0)
 					task.task_state.Activity[index].State = ActivityCompleted;
