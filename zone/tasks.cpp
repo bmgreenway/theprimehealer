@@ -21,6 +21,7 @@ Copyright (C) 2001-2008 EQEMu Development Team (http://eqemulator.net)
 #include "tasks.h"
 
 #include <string.h>
+#include <fmt/format.h>
 
 #ifdef _WINDOWS
 #define strcasecmp _stricmp
@@ -752,9 +753,14 @@ bool TaskManager::LoadClientState(Client *c, ClientTaskState *state)
 		}
 	}
 
+	int shared_task_id = database.GetSharedTaskID(c->GetName());
+
+	// okay, we have a shared task
+	if (shared_task_id != 0)
+		state->AddToSharedTask(c, shared_task_id);
+
 	if (state->ActiveTask.TaskID != TASKSLOTEMPTY)
 		state->UnlockActivities(state->ActiveTask);
-	// TODO: shared
 	for (int i = 0; i < MAXACTIVEQUESTS; i++)
 		if (state->ActiveQuests[i].TaskID != TASKSLOTEMPTY)
 			state->UnlockActivities(state->ActiveQuests[i]);
@@ -3047,10 +3053,41 @@ void TaskManager::SendActiveTaskDescription(Client *c, int TaskID, ClientTaskInf
 	safe_delete(outapp);
 }
 
-// TODO: stub
-SharedTaskState *TaskManager::LoadSharedTask(int id)
+SharedTaskState *TaskManager::LoadSharedTask(int id, ClientTaskState *state)
 {
-	return nullptr;
+	std::string query = fmt::format("SELECT task_id, accepted_time, is_locked FROM shared_task_state WHERE id = {}", id);
+	auto results = database.QueryDatabase(query);
+
+	if (!results.Success() && results.RowCount() != 1) { // shit, log or something
+		return nullptr;
+	}
+
+	auto row = results.begin();
+	int task_id = atoi(row[0]);
+	auto task_state = taskmanager->CreateSharedTask(id, task_id);
+	if (task_state == nullptr) { // shit
+		return nullptr;
+	}
+
+	auto task_activity = task_state->GetActivity();
+
+	task_activity->TaskID = task_id;
+	task_activity->AcceptedTime = atoi(row[1]);
+	task_activity->Updated = true;
+	task_activity->CurrentStep = -1;
+
+	task_state->SetLocked(atoi(row[2]) != 0);
+
+	for (int i = 0; i < taskmanager->Tasks[task_id]->ActivityCount; i++) {
+		task_activity->Activity[i].ActivityID = i;
+		task_activity->Activity[i].DoneCount = 0;
+		task_activity->Activity[i].State = ActivityHidden;
+		task_activity->Activity[i].Updated = true;
+	}
+
+	state->UnlockActivities(*task_activity);
+
+	return task_state;
 }
 
 SharedTaskState *TaskManager::GetSharedTask(int id)
@@ -3546,9 +3583,10 @@ void ClientTaskState::AcceptNewSharedTask(Client *c, int TaskID, int NPCID, int 
  */
 void ClientTaskState::AddToSharedTask(Client *c, int TaskID)
 {
+	Log(Logs::General, Logs::Tasks, "Adding client (%s:%d) to shared task %d", c->GetName(), c->CharacterID());
 	auto task = taskmanager->GetSharedTask(TaskID);
 	if (!task)
-		task = taskmanager->LoadSharedTask(TaskID);
+		task = taskmanager->LoadSharedTask(TaskID, this);
 
 	if (!task) {// FUCK
 		return;

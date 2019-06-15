@@ -2161,6 +2161,22 @@ void Database::LoadLogSettings(EQEmuLogSys::LogSettings* log_settings) {
 	}
 }
 
+int Database::GetSharedTaskID(const char *name)
+{
+	auto query = fmt::format("SELECT `shared_task_id` FROM `shared_task_members` WHERE `character_name` = '{}'", name);
+	auto results = QueryDatabase(query);
+
+	if (!results.Success())
+		return 0;
+
+	if (results.RowCount() == 0)
+		return 0;
+
+	auto row = results.begin();
+
+	return atoi(row[0]);
+}
+
 int Database::CountInvSnapshots() {
 	std::string query = StringFormat("SELECT COUNT(*) FROM (SELECT * FROM `inventory_snapshots` a GROUP BY `charid`, `time_index`) b");
 	auto results = QueryDatabase(query);

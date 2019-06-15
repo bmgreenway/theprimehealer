@@ -270,6 +270,9 @@ public:
 	/* EQEmuLogSys */
 	void	LoadLogSettings(EQEmuLogSys::LogSettings* log_settings);
 
+	/* Shared Tasks */
+	int GetSharedTaskID(const char *name);
+
 private:
 	std::map<uint32,std::string>	zonename_array;
 

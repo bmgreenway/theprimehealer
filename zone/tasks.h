@@ -271,7 +271,7 @@ public:
 	bool IsTaskRepeatable(int TaskID);
 	friend class ClientTaskState;
 
-	SharedTaskState *LoadSharedTask(int id); // loads the shared task state
+	SharedTaskState *LoadSharedTask(int id, ClientTaskState *state); // loads the shared task state
 	SharedTaskState *CreateSharedTask(int id, int task_id);
 	SharedTaskState *GetSharedTask(int id);
 
