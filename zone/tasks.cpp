@@ -3092,7 +3092,7 @@ SharedTaskState *TaskManager::LoadSharedTask(int id, ClientTaskState *state)
 		if (atoi(row[2]) != 0)
 			task_activity->Activity[index].State = ActivityCompleted;
 		else
-			task_activity->Activity[index].State = ActivityHidden
+			task_activity->Activity[index].State = ActivityHidden;
 	}
 
 	query = fmt::format("SELECT character_name, is_leader FROM shared_task_members WHERE shared_task_id = {}", id);
@@ -3503,7 +3503,7 @@ void ClientTaskState::RequestSharedTask(Client *c, int TaskID, int NPCID, bool e
 				continue;
 
 			// TODO: mercs/bots ahh this will just break in world for now :D
-			if (group->membername[0] != '\0')
+			if (group->membername[i][0] != '\0')
 				buf.WriteString(group->membername[i]);
 		}
 	} else if (raid) {
