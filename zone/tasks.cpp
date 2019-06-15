@@ -1412,37 +1412,6 @@ bool ClientTaskState::UnlockActivities(int CharID, ClientTaskInformation &task_i
 			}
 		}
 
-		if (AllActivitiesComplete && RuleB(TaskSystem, RecordCompletedTasks)) {
-			if (RuleB(TasksSystem, KeepOneRecordPerCompletedTask)) {
-				Log(Logs::General, Logs::Tasks, "[UPDATE] KeepOneRecord enabled");
-				auto Iterator = CompletedTasks.begin();
-				int ErasedElements = 0;
-				while (Iterator != CompletedTasks.end()) {
-					int TaskID = (*Iterator).TaskID;
-					if (TaskID == task_info.TaskID) {
-						Iterator = CompletedTasks.erase(Iterator);
-						ErasedElements++;
-					} else
-						++Iterator;
-				}
-
-				Log(Logs::General, Logs::Tasks, "[UPDATE] Erased Element count is %i", ErasedElements);
-
-				if (ErasedElements) {
-					LastCompletedTaskLoaded -= ErasedElements;
-					DeleteCompletedTaskFromDatabase(CharID, task_info.TaskID);
-				}
-			}
-
-			CompletedTaskInformation cti;
-			cti.TaskID = task_info.TaskID;
-			cti.CompletedTime = time(nullptr);
-
-			for (int i = 0; i < Task->ActivityCount; i++)
-				cti.ActivityDone[i] = (task_info.Activity[i].State == ActivityCompleted);
-
-			CompletedTasks.push_back(cti);
-		}
 
 		Log(Logs::General, Logs::Tasks, "[UPDATE] Returning sequential task, AllActivitiesComplete is %i",
 		    AllActivitiesComplete);
@@ -1487,40 +1456,6 @@ bool ClientTaskState::UnlockActivities(int CharID, ClientTaskInformation &task_i
 	}
 
 	if (AllActivitiesComplete) {
-		if (RuleB(TaskSystem, RecordCompletedTasks)) {
-			// If we are only keeping one completed record per task, and the player has done
-			// the same task again, erase the previous completed entry for this task.
-			if (RuleB(TasksSystem, KeepOneRecordPerCompletedTask)) {
-				Log(Logs::General, Logs::Tasks, "[UPDATE] KeepOneRecord enabled");
-				auto Iterator = CompletedTasks.begin();
-				int ErasedElements = 0;
-
-				while (Iterator != CompletedTasks.end()) {
-					int TaskID = (*Iterator).TaskID;
-					if (TaskID == task_info.TaskID) {
-						Iterator = CompletedTasks.erase(Iterator);
-						ErasedElements++;
-					} else
-						++Iterator;
-				}
-
-				Log(Logs::General, Logs::Tasks, "[UPDATE] Erased Element count is %i", ErasedElements);
-
-				if (ErasedElements) {
-					LastCompletedTaskLoaded -= ErasedElements;
-					DeleteCompletedTaskFromDatabase(CharID, task_info.TaskID);
-				}
-			}
-
-			CompletedTaskInformation cti;
-			cti.TaskID = task_info.TaskID;
-			cti.CompletedTime = time(nullptr);
-
-			for (int i = 0; i < Task->ActivityCount; i++)
-				cti.ActivityDone[i] = (task_info.Activity[i].State == ActivityCompleted);
-
-			CompletedTasks.push_back(cti);
-		}
 		return true;
 	}
 
@@ -1535,6 +1470,47 @@ bool ClientTaskState::UnlockActivities(int CharID, ClientTaskInformation &task_i
 	}
 
 	return false;
+}
+
+void ClientTaskState::RecordCompletedTasks(int char_id, ClientTaskInformation &task_info)
+{
+	if (!RuleB(TasksSystem, RecordCompletedTasks))
+		return;
+
+	TaskInformation* Task = taskmanager->Tasks[task_info.TaskID];
+
+	// we only want one record, erase old
+	if (RuleB(TasksSystem, KeepOneRecordPerCompletedTask)) {
+		Log(Logs::General, Logs::Tasks, "[UPDATE] KeepOneRecord enabled");
+		// so we may have enabled this after it was off and we have more than one record already ...
+		int erased_count = 0;
+		auto pred = [&task_info](const CompletedTaskInformation &a) { return a.TaskID == task_info.TaskID; };
+		auto it = std::find_if(CompletedTasks.begin(), CompletedTasks.end(), pred);
+		while (true) {
+			if (it == CompletedTasks.end())
+				break;
+			it = CompletedTasks.erase(it);
+			// continue from where we left off instead of searching stuff already searched
+			it = std::find_if(it, CompletedTasks.end(), pred);
+			++erased_count;
+		}
+
+		Log(Logs::General, Logs::Tasks, "[UPDATE] Erased Element count is %i", erased_count);
+
+		if (erased_count) {
+			LastCompletedTaskLoaded -= erased_count;
+			DeleteCompletedTaskFromDatabase(char_id, task_info.TaskID);
+		}
+	}
+
+	CompletedTaskInformation cti;
+	cti.TaskID = task_info.TaskID;
+	cti.CompletedTime = time(nullptr);
+
+	for (int i = 0; i < Task->ActivityCount; i++)
+		cti.ActivityDone[i] = (task_info.Activity[i].State == ActivityCompleted);
+
+	CompletedTasks.push_back(cti);
 }
 
 void ClientTaskState::UpdateTasksOnKill(Client *c, int NPCTypeID) {
@@ -1975,6 +1951,8 @@ void ClientTaskState::IncrementDoneCount(Client *c, TaskInformation *Task, int T
 		info->Activity[ActivityID].State = ActivityCompleted;
 		// Unlock subsequent activities for this task
 		bool TaskComplete = UnlockActivities(c->CharacterID(), *info);
+		if (TaskComplete)
+			RecordCompletedTasks(c->CharacterID(), *info);
 		Log(Logs::General, Logs::Tasks, "[UPDATE] TaskCompleted is %i", TaskComplete);
 		// and by the 'Task Stage Completed' message
 		c->SendTaskActivityComplete(info->TaskID, ActivityID, TaskIndex, Task->type);
