@@ -756,8 +756,12 @@ bool TaskManager::LoadClientState(Client *c, ClientTaskState *state)
 	int shared_task_id = database.GetSharedTaskID(c->GetName());
 
 	// okay, we have a shared task
-	if (shared_task_id != 0)
+	if (shared_task_id != 0) {
+		Log(Logs::General, Logs::Tasks,
+		    "[CLIENTLOAD] LoadClientState for Character ID %d found shared task ID %d", characterID,
+		    shared_task_id);
 		state->AddToSharedTask(c, shared_task_id);
+	}
 
 	if (state->ActiveTask.TaskID != TASKSLOTEMPTY)
 		state->UnlockActivities(state->ActiveTask);
