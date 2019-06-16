@@ -3058,7 +3058,10 @@ SharedTaskState *TaskManager::LoadSharedTask(int id, ClientTaskState *state)
 	std::string query = fmt::format("SELECT task_id, accepted_time, is_locked FROM shared_task_state WHERE id = {}", id);
 	auto results = database.QueryDatabase(query);
 
-	if (!results.Success() && results.RowCount() != 1) { // shit, log or something
+	const char *ERR_MYSQLERROR = "[TASKS]Error in TaskManager::LoadSharedTask: %s";
+
+	if (!results.Success()) {
+		Log(Logs::General, Logs::Error, ERR_MYSQLERROR, results.ErrorMessage().c_str());
 		return nullptr;
 	}
 
@@ -3066,6 +3069,7 @@ SharedTaskState *TaskManager::LoadSharedTask(int id, ClientTaskState *state)
 	int task_id = atoi(row[0]);
 	auto task_state = taskmanager->CreateSharedTask(id, task_id);
 	if (task_state == nullptr) { // shit
+		Log(Logs::General, Logs::Tasks, "Failed CreateSharedTask() in LoadSharedTask()");
 		return nullptr;
 	}
 
@@ -3082,6 +3086,7 @@ SharedTaskState *TaskManager::LoadSharedTask(int id, ClientTaskState *state)
 	results = database.QueryDatabase(query);
 	if (!results.Success()) {
 		// hmmm
+		Log(Logs::General, Logs::Error, ERR_MYSQLERROR, results.ErrorMessage().c_str());
 		return nullptr;
 	}
 
@@ -3099,6 +3104,7 @@ SharedTaskState *TaskManager::LoadSharedTask(int id, ClientTaskState *state)
 	results = database.QueryDatabase(query);
 	if (!results.Success()) {
 		// hmmm
+		Log(Logs::General, Logs::Error, ERR_MYSQLERROR, results.ErrorMessage().c_str());
 		return nullptr;
 	}
 
@@ -3526,10 +3532,14 @@ void ClientTaskState::RequestSharedTask(Client *c, int TaskID, int NPCID, bool e
 void ClientTaskState::AcceptNewSharedTask(Client *c, int TaskID, int NPCID, int id, int accepted_time,
 					  std::vector<std::string> &members)
 {
+	Log(Logs::General, Logs::Tasks,
+	    "AcceptNewSharedTask for %s TaskID %d NPCID %d shared task ID %d accepted_time %d member count %d",
+	    c->GetName(), TaskID, NPCID, id, accepted_time, members.size());
 	// all of this data should have been verified already
 	// first we need to create the new SharedTaskState
 	auto task_state = taskmanager->CreateSharedTask(id, TaskID);
 	if (!task_state) {
+		Log(Logs::General, Logs::Tasks, "Failed CreateSharedTask() in AcceptNewSharedTask()");
 		// TODO: something failed, tell world
 		return;
 	}
@@ -3603,12 +3613,13 @@ void ClientTaskState::AcceptNewSharedTask(Client *c, int TaskID, int NPCID, int 
  */
 void ClientTaskState::AddToSharedTask(Client *c, int TaskID)
 {
-	Log(Logs::General, Logs::Tasks, "Adding client (%s:%d) to shared task %d", c->GetName(), c->CharacterID());
+	Log(Logs::General, Logs::Tasks, "Adding client (%s:%d) to shared task %d", c->GetName(), c->CharacterID(), TaskID);
 	auto task = taskmanager->GetSharedTask(TaskID);
 	if (!task)
 		task = taskmanager->LoadSharedTask(TaskID, this);
 
 	if (!task) {// FUCK
+		Log(Logs::General, Logs::Tasks, "Failed to load shared task %d", TaskID);
 		return;
 	}
 
