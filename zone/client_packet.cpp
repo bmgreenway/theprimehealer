@@ -905,6 +905,11 @@ void Client::CompleteConnect()
 
 	database.LoadAuras(this); // this ends up spawning them so probably safer to load this later (here)
 
+	/* Task Packets - shared task members list doesn't work too much earlier
+	 * TODO: figure out when this actually suppose to come, works fine here though
+	 */
+	LoadClientTaskState();
+
 	entity_list.RefreshClientXTargets(this);
 
 	worldserver.RequestTellQueue(GetName());
@@ -1675,9 +1680,6 @@ void Client::Handle_Connect_OP_ZoneEntry(const EQApplicationPacket *app)
 		// this is kinda hackish atm..this process needs to be realigned to allow a contiguous flow
 		m_inv.SetGMInventory((bool)m_pp.gm); // reset back to current gm state
 	}
-
-	/* Task Packets */
-	LoadClientTaskState();
 
 	/**
 	 * DevTools Load Settings
