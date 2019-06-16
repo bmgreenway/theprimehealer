@@ -80,8 +80,6 @@ private:
 	SharedTaskMemberList members;
 	std::vector<int> char_ids; // every char id of someone to be locked out, different in case they leave/removed
 	ClientTaskInformation task_state; // book keeping
-
-	friend class SharedTaskManager;
 };
 
 class SharedTaskManager {
