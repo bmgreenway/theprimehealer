@@ -3079,6 +3079,7 @@ SharedTaskState *TaskManager::LoadSharedTask(int id, ClientTaskState *state)
 
 	auto task_activity = task_state->GetActivity();
 
+	task_activity->slot = 0;
 	task_activity->TaskID = task_id;
 	task_activity->AcceptedTime = atoi(row[1]);
 	task_activity->Updated = true;
@@ -3551,6 +3552,7 @@ void ClientTaskState::AcceptNewSharedTask(Client *c, int TaskID, int NPCID, int 
 	// we need to init the activity now
 	auto task_activity = task_state->GetActivity();
 
+	task_activity->slot = 0;
 	task_activity->TaskID = TaskID;
 	task_activity->AcceptedTime = accepted_time;
 	task_activity->Updated = true;

@@ -384,6 +384,8 @@ bool SharedTaskManager::LoadSharedTaskState()
 			int id = atoi(row[0]);
 
 			auto &task = tasks[id];
+			task.task_state.slot = 0;
+			task.task_state.Updated = false;
 			task.SetID(id);
 			task.SetTaskID(atoi(row[1]));
 			task.SetAcceptedTime(atoi(row[2]));
