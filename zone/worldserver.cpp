@@ -1992,6 +1992,18 @@ void WorldServer::HandleMessage(uint16 opcode, const EQ::Net::Packet &p)
 			client->AddToSharedTask(task_id);
 		break;
 	}
+	case ServerOP_TaskActivityUpdate:
+	{
+		int task_id = pack->ReadUInt32();
+		auto task = taskmanager->GetSharedTask(task_id);
+		// we don't have this task, ignore it!
+		if (!task)
+			return;
+		int activity_id = pack->ReadUInt32();
+		int value = pack->ReadUInt32();
+		task->UpdateActivity(activity_id, value);
+		break;
+	}
 	default: {
 		std::cout << " Unknown ZSopcode:" << (int)pack->opcode;
 		std::cout << " size:" << pack->size << std::endl;

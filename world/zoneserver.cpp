@@ -1361,6 +1361,11 @@ void ZoneServer::HandleMessage(uint16 opcode, const EQ::Net::Packet &p) {
 		shared_tasks.HandleTaskZoneCreated(pack);
 		break;
 	}
+	case ServerOP_TaskActivityUpdate:
+	{
+		shared_tasks.HandleTaskActivityUpdate(pack);
+		break;
+	}
 	default:
 	{
 		Log(Logs::Detail, Logs::World_Server, "Unknown ServerOPcode from zone 0x%04x, size %d", pack->opcode, pack->size);

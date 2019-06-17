@@ -111,6 +111,8 @@ public:
 	void MemberZoned(Mob *player); // player left zone, update their pointer
 	void MemberEnterZone(Mob *player); // player entered zone, update their pointer
 
+	void SendActivityUpdate(int activity_id);
+
 	void AddMember(std::string name, Mob *entity = nullptr, bool leader = false)
 	{
 		members.push_back({name, entity, leader});
@@ -119,6 +121,8 @@ public:
 	}
 
 	void SendMembersList(Client *to) const;
+
+	void UpdateActivity(int activity_id, int value);
 
 	ClientTaskInformation *GetActivity() { return &activity; }
 

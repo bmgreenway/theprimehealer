@@ -63,6 +63,8 @@ public:
 	bool UnlockActivities();
 	inline void SetUpdated(bool in = true) { task_state.Updated = in; }
 
+	void ProcessActivityUpdate(int activity_id);
+
 	void Save(); // save to database
 
 	friend class SharedTaskManager;
@@ -108,9 +110,18 @@ public:
 			return 0; // hmm
 	}
 
+	inline const TaskInformation *GetTaskInformation(int task_id) const {
+		auto it = task_information.find(task_id);
+		if (it != task_information.end())
+			return &(it->second);
+		else
+			return nullptr;
+	}
+
 	// IPC packet processing
 	void HandleTaskRequest(ServerPacket *pack);
 	void HandleTaskZoneCreated(ServerPacket *pack);
+	void HandleTaskActivityUpdate(ServerPacket *pack);
 
 	void Process();
 

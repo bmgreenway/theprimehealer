@@ -3889,6 +3889,23 @@ void SharedTaskState::MemberEnterZone(Mob *player)
 	it->entity = player;
 }
 
+/*
+ * We tell world we had an event that matched an activity
+ * This should really be all we need to tell world. World mostly needs to handle
+ * cases like multiple events firing at once (in different zones) and making
+ * sure we don't update past the count (events will be thrown out in that case)
+ */
+void SharedTaskState::SendActivityUpdate(int activity_id)
+{
+	auto pack = new ServerPacket(ServerOP_TaskActivityUpdate, sizeof(ServerSharedTaskActivity_Struct));
+	auto update = (ServerSharedTaskActivity_Struct *)pack->pBuffer;
+	update->id = id;
+	update->activity_id = activity_id;
+	update->value = 1;
+	worldserver.SendPacket(pack);
+	safe_delete(pack);
+}
+
 void SharedTaskState::SendMembersList(Client *to) const
 {
 	if (!to)
@@ -3909,5 +3926,13 @@ void SharedTaskState::SendMembersList(Client *to) const
 
 	to->QueuePacket(outapp);
 	safe_delete(outapp);
+}
+
+/*
+ * This is the second half of the shared tasks "IncrementDoneCount" I guess
+ */
+void SharedTaskState::UpdateActivity(int activity_id, int value)
+{
+	activity.Activity[activity_id].DoneCount = value;
 }
 

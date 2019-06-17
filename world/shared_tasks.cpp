@@ -213,6 +213,24 @@ void SharedTaskManager::HandleTaskZoneCreated(ServerPacket *pack)
 	safe_delete(outpack);
 }
 
+void SharedTaskManager::HandleTaskActivityUpdate(ServerPacket *pack)
+{
+	if (!pack)
+		return;
+
+	if (pack->size != sizeof(ServerOP_TaskActivityUpdate))
+		return;
+
+	auto update = (ServerSharedTaskActivity_Struct *)pack->pBuffer;
+
+	auto task = GetSharedTask(update->id);
+
+	if (!task) // guess it wasn't loaded?
+		return;
+
+	task->ProcessActivityUpdate(update->activity_id);
+}
+
 /*
  * Loads in the tasks and task_activity tables
  * We limit to shared to save some memory
@@ -630,3 +648,42 @@ bool SharedTask::UnlockActivities()
 {
 	return true;
 }
+
+/*
+ * We just need to verify the activity can be updated, if it can, we tell zones
+ * to do so. Update just means ticking up a count.
+ *
+ * We can safely throw away updates that would put us over the count
+ *
+ * zone has verified a lot of stuff, we're just doing it here to verify sync and shit
+ */
+void SharedTask::ProcessActivityUpdate(int activity_id)
+{
+	auto task_info = shared_tasks.GetTaskInformation(task_id);
+	// not shared task?
+	if (task_info == nullptr)
+		return;
+
+	// OOB, throw it away
+	if (activity_id > task_info->ActivityCount)
+		return;
+
+	// we're already done!
+	if (task_state.Activity[activity_id].DoneCount == task_info->Activity[activity_id].GoalCount)
+		return;
+
+	task_state.Activity[activity_id].DoneCount++;
+	task_state.Activity[activity_id].Updated = true;
+
+	// we just fire off to all zones, fuck it!
+	auto pack = new ServerPacket(ServerOP_TaskActivityUpdate, sizeof(ServerSharedTaskActivity_Struct));
+	auto update = (ServerSharedTaskActivity_Struct *)pack->pBuffer;
+	update->id = id;
+	update->activity_id = activity_id;
+	update->value = task_state.Activity[activity_id].DoneCount;
+	zoneserver_list.SendPacket(pack);
+	safe_delete(pack);
+
+	Save();
+}
+

@@ -159,6 +159,7 @@
 #define ServerOP_TaskRemovePlayer	0x0304 // .. /taskremoveplayer ..
 #define ServerOP_TaskZoneCreated	0x0305 // zone -> world. Something didn't go wrong creating the new task! Now World needs to tell other players to join world -> zone response to tell someone to join
 #define ServerOP_TaskZoneFailed		0x0306 // zone -> world. Something went wrong above ABORT
+#define ServerOP_TaskActivityUpdate	0x0307 // zone -> world. Is this valid update? world -> zone update activity
 
 #define ServerOP_EncapPacket		0x2007	// Packet within a packet
 #define ServerOP_WorldListUpdate	0x2008
@@ -1341,6 +1342,14 @@ struct ServerSharedTaskMember_Struct { // used for various things we just need t
 	uint32 id;
 	char name[64];
 };
+
+// we should be able to leave this nice and simple. Don't think we need to really get fancy
+struct ServerSharedTaskActivity_Struct {
+	uint32 id;
+	uint32 activity_id;
+	uint32 value; // zone -> world ignored for now (maybe amount to increase by if ever applicable) world -> zone new value of the activity
+};
+
 // error constants
 #define TASKJOINOOZ_CAN				0
 #define TASKJOINOOZ_NOTASK			1
