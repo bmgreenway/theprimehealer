@@ -228,7 +228,7 @@ void SharedTaskManager::HandleTaskActivityUpdate(ServerPacket *pack)
 	if (!task) // guess it wasn't loaded?
 		return;
 
-	task->ProcessActivityUpdate(update->activity_id);
+	task->ProcessActivityUpdate(update->activity_id, update->value);
 }
 
 /*
@@ -657,7 +657,7 @@ bool SharedTask::UnlockActivities()
  *
  * zone has verified a lot of stuff, we're just doing it here to verify sync and shit
  */
-void SharedTask::ProcessActivityUpdate(int activity_id)
+void SharedTask::ProcessActivityUpdate(int activity_id, int value)
 {
 	auto task_info = shared_tasks.GetTaskInformation(task_id);
 	// not shared task?
@@ -672,7 +672,8 @@ void SharedTask::ProcessActivityUpdate(int activity_id)
 	if (task_state.Activity[activity_id].DoneCount == task_info->Activity[activity_id].GoalCount)
 		return;
 
-	task_state.Activity[activity_id].DoneCount++;
+	task_state.Activity[activity_id].DoneCount =
+	    std::min(task_state.Activity[activity_id].DoneCount + value, task_info->Activity[activity_id].GoalCount);
 	task_state.Activity[activity_id].Updated = true;
 
 	// we just fire off to all zones, fuck it!

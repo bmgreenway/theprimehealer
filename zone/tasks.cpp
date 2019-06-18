@@ -1538,7 +1538,8 @@ bool ClientTaskState::UpdateTasksByNPC(Client *c, int ActivityType, int NPCTypeI
 
 	// If the client has no tasks, there is nothing further to check.
 
-	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY)) // could be better ...
+	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY &&
+			     ActiveSharedTask == nullptr)) // could be better ...
 		return false;
 
 	// loop over the union of tasks and quests
@@ -1592,6 +1593,51 @@ bool ClientTaskState::UpdateTasksByNPC(Client *c, int ActivityType, int NPCTypeI
 			Ret = true;
 		}
 	}
+	// Process for shared tasks. Kill type activities are handled elsewhere to
+	// prevent a single event from firing more than once. Others don't have this
+	// issue so we do it here.
+	if (ActiveSharedTask != nullptr && ActivityType != ActivityKill) {
+		auto task = taskmanager->Tasks[ActiveSharedTask->GetTaskID()];
+		if (task == nullptr)
+			return Ret;
+
+		for (int i = 0; i < task->ActivityCount; ++i) {
+			auto activity = ActiveSharedTask->GetActivity();
+			if (activity == nullptr)
+				continue;
+			// We are not interested in completed or hidden activities
+			if (activity->Activity[i].State != ActivityActive)
+				continue;
+			// We are only interested in Kill activities
+			if (task->Activity[i].Type != ActivityKill)
+				continue;
+			// Is there a zone restriction on the activity ?
+			if (!task->Activity[i].CheckZone(zone->GetZoneID())) {
+				Log(Logs::General, Logs::Tasks,
+				    "[UPDATE] Char: %s Task: %i, Activity %i, Activity type %i for NPC %i failed zone "
+				    "check",
+				    c->GetName(), ActiveSharedTask->GetTaskID(), i, ActivityType, NPCTypeID);
+				continue;
+			}
+			// Is the activity to kill this type of NPC ?
+			switch (task->Activity[i].GoalMethod) {
+			case METHODSINGLEID:
+				if (task->Activity[i].GoalID != NPCTypeID)
+					continue;
+				break;
+			case METHODLIST:
+				if (!taskmanager->GoalListManager.IsInList(task->Activity[i].GoalID, NPCTypeID))
+					continue;
+				break;
+			default:
+				// If METHODQUEST, don't update the activity here
+				continue;
+			}
+			Log(Logs::General, Logs::Tasks, "[UPDATE] Calling SendActivityUpdate for ByNPC");
+			ActiveSharedTask->SendActivityUpdate(i);
+			Ret = true;
+		}
+	}
 
 	return Ret;
 }
@@ -1601,7 +1647,8 @@ int ClientTaskState::ActiveSpeakTask(int NPCTypeID) {
 	// This method is to be used from Perl quests only and returns the TaskID of the first
 	// active task found which has an active SpeakWith activity for this NPC.
 
-	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY)) // could be better ...
+	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY &&
+			     ActiveSharedTask == nullptr)) // could be better ...
 		return 0;
 
 	// loop over the union of tasks and quests
@@ -1629,6 +1676,29 @@ int ClientTaskState::ActiveSpeakTask(int NPCTypeID) {
 				return cur_task->TaskID;
 		}
 	}
+
+	if (ActiveSharedTask != nullptr) {
+		auto cur_task = ActiveSharedTask->GetActivity();
+
+		auto Task = taskmanager->Tasks[ActiveSharedTask->GetTaskID()];
+
+		if (Task == nullptr)
+			return 0;
+
+		for (int j = 0; j < Task->ActivityCount; j++) {
+			// We are not interested in completed or hidden activities
+			if (cur_task->Activity[j].State != ActivityActive)
+				continue;
+			if (Task->Activity[j].Type != ActivitySpeakWith)
+				continue;
+			// Is there a zone restriction on the activity ?
+			if (!Task->Activity[j].CheckZone(zone->GetZoneID()))
+				continue;
+			// Is the activity to speak with this type of NPC ?
+			if (Task->Activity[j].GoalMethod == METHODQUEST && Task->Activity[j].GoalID == NPCTypeID)
+				return cur_task->TaskID;
+		}
+	}
 	return 0;
 }
 
@@ -1637,7 +1707,8 @@ int ClientTaskState::ActiveSpeakActivity(int NPCTypeID, int TaskID) {
 	// This method is to be used from Perl quests only and returns the ActivityID of the first
 	// active activity found in the specified task which is to SpeakWith this NPC.
 
-	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY)) // could be better ...
+	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY &&
+			     ActiveSharedTask == nullptr)) // could be better ...
 		return -1;
 	if (TaskID <= 0 || TaskID >= MAXTASKS)
 		return -1;
@@ -1666,9 +1737,33 @@ int ClientTaskState::ActiveSpeakActivity(int NPCTypeID, int TaskID) {
 			if (Task->Activity[j].GoalMethod == METHODQUEST && Task->Activity[j].GoalID == NPCTypeID)
 				return j;
 		}
-		return 0;
+		return -1;
 	}
-	return 0;
+	if (ActiveSharedTask != nullptr) {
+		auto cur_task = ActiveSharedTask->GetActivity();
+		if (cur_task->TaskID != TaskID)
+			return -1;
+
+		TaskInformation* Task = taskmanager->Tasks[cur_task->TaskID];
+
+		if (Task == nullptr)
+			return -1;
+
+		for (int j = 0; j < Task->ActivityCount; j++) {
+			// We are not interested in completed or hidden activities
+			if (cur_task->Activity[j].State != ActivityActive)
+				continue;
+			if (Task->Activity[j].Type != ActivitySpeakWith)
+				continue;
+			// Is there a zone restriction on the activity ?
+			if (!Task->Activity[j].CheckZone(zone->GetZoneID()))
+				continue;
+			// Is the activity to speak with this type of NPC ?
+			if (Task->Activity[j].GoalMethod == METHODQUEST && Task->Activity[j].GoalID == NPCTypeID)
+				return j;
+		}
+	}
+	return -1;
 }
 
 void ClientTaskState::UpdateTasksForItem(Client *c, ActivityType Type, int ItemID, int Count) {
@@ -1682,7 +1777,8 @@ void ClientTaskState::UpdateTasksForItem(Client *c, ActivityType Type, int ItemI
 
 	Log(Logs::General, Logs::Tasks, "[UPDATE] ClientTaskState::UpdateTasksForItem(%d,%d)", Type, ItemID);
 
-	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY)) // could be better ...
+	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY &&
+			     ActiveSharedTask == nullptr)) // could be better ...
 		return;
 
 	// loop over the union of tasks and quests
@@ -1733,6 +1829,49 @@ void ClientTaskState::UpdateTasksForItem(Client *c, ActivityType Type, int ItemI
 		}
 	}
 
+	if (ActiveSharedTask != nullptr) {
+		auto cur_task = ActiveSharedTask->GetActivity();
+
+		auto Task = taskmanager->Tasks[cur_task->TaskID];
+
+		if (Task == nullptr)
+			return;
+
+		for (int j = 0; j < Task->ActivityCount; j++) {
+			// We are not interested in completed or hidden activities
+			if (cur_task->Activity[j].State != ActivityActive)
+				continue;
+			// We are only interested in the ActivityType we were called with
+			if (Task->Activity[j].Type != (int)Type)
+				continue;
+			// Is there a zone restriction on the activity ?
+			if (!Task->Activity[j].CheckZone(zone->GetZoneID())) {
+				Log(Logs::General, Logs::Tasks, "[UPDATE] Char: %s Activity type %i for Item %i failed zone check",
+							c->GetName(), Type, ItemID);
+				continue;
+			}
+			// Is the activity related to this item ?
+			//
+			switch(Task->Activity[j].GoalMethod) {
+
+				case METHODSINGLEID:
+					if(Task->Activity[j].GoalID != ItemID) continue;
+					break;
+
+				case METHODLIST:
+					if(!taskmanager->GoalListManager.IsInList(Task->Activity[j].GoalID, ItemID)) continue;
+					break;
+
+				default:
+					// If METHODQUEST, don't update the activity here
+					continue;
+			}
+			// We found an active task related to this item, so increment the done count
+			Log(Logs::General, Logs::Tasks, "[UPDATE] Calling SendActivityUpdate ForItem");
+			ActiveSharedTask->SendActivityUpdate(j, Count);
+		}
+	}
+
 	return;
 }
 
@@ -1742,7 +1881,8 @@ void ClientTaskState::UpdateTasksOnExplore(Client *c, int ExploreID)
 	// If the client has no tasks, there is nothing further to check.
 
 	Log(Logs::General, Logs::Tasks, "[UPDATE] ClientTaskState::UpdateTasksOnExplore(%i)", ExploreID);
-	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY)) // could be better ...
+	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY &&
+			     ActiveSharedTask == nullptr)) // could be better ...
 		return;
 
 	// loop over the union of tasks and quests
@@ -1796,6 +1936,51 @@ void ClientTaskState::UpdateTasksOnExplore(Client *c, int ExploreID)
 		}
 	}
 
+	if (ActiveSharedTask != nullptr) {
+		auto cur_task = ActiveSharedTask->GetActivity();
+
+		auto Task = taskmanager->Tasks[cur_task->TaskID];
+
+		if (Task == nullptr)
+			return;
+
+		for (int j = 0; j < Task->ActivityCount; j++) {
+			// We are not interested in completed or hidden activities
+			if (cur_task->Activity[j].State != ActivityActive)
+				continue;
+			// We are only interested in explore activities
+			if (Task->Activity[j].Type != ActivityExplore)
+				continue;
+			if (!Task->Activity[j].CheckZone(zone->GetZoneID())) {
+				Log(Logs::General, Logs::Tasks,
+				    "[UPDATE] Char: %s Explore exploreid %i failed zone check", c->GetName(),
+				    ExploreID);
+				continue;
+			}
+			// Is the activity to explore this area id ?
+			switch (Task->Activity[j].GoalMethod) {
+
+			case METHODSINGLEID:
+				if (Task->Activity[j].GoalID != ExploreID)
+					continue;
+				break;
+
+			case METHODLIST:
+				if (!taskmanager->GoalListManager.IsInList(Task->Activity[j].GoalID, ExploreID))
+					continue;
+				break;
+
+			default:
+				// If METHODQUEST, don't update the activity here
+				continue;
+			}
+			// We found an active task to explore this area, so set done count to goal count
+			// (Only a goal count of 1 makes sense for explore activities?)
+			Log(Logs::General, Logs::Tasks, "[UPDATE] SendActivityUpdate on Explore");
+			ActiveSharedTask->SendActivityUpdate(j);
+		}
+	}
+
 	return;
 }
 
@@ -1805,7 +1990,8 @@ bool ClientTaskState::UpdateTasksOnDeliver(Client *c, std::list<EQEmu::ItemInsta
 
 	Log(Logs::General, Logs::Tasks, "[UPDATE] ClientTaskState::UpdateTasksForOnDeliver(%d)", NPCTypeID);
 
-	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY)) // could be better ...
+	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY &&
+			     ActiveSharedTask == nullptr)) // could be better ...
 		return false;
 
 	// loop over the union of tasks and quests
@@ -1873,9 +2059,70 @@ bool ClientTaskState::UpdateTasksOnDeliver(Client *c, std::list<EQEmu::ItemInsta
 		}
 	}
 
+	if (ActiveSharedTask != nullptr) {
+		auto cur_task = ActiveSharedTask->GetActivity();
+
+		auto Task = taskmanager->Tasks[cur_task->TaskID];
+
+		if (Task == nullptr)
+			return false;
+
+		for (int j = 0; j < Task->ActivityCount; j++) {
+			// We are not interested in completed or hidden activities
+			if (cur_task->Activity[j].State != ActivityActive)
+				continue;
+			// We are only interested in Deliver activities
+			if (Task->Activity[j].Type != ActivityDeliver && Task->Activity[j].Type != ActivityGiveCash)
+				continue;
+			// Is there a zone restriction on the activity ?
+			if (!Task->Activity[j].CheckZone(zone->GetZoneID())) {
+				Log(Logs::General, Logs::Tasks,
+				    "[UPDATE] Char: %s Deliver activity failed zone check (current zone %i, need zone "
+				    "%s",
+				    c->GetName(), zone->GetZoneID(), Task->Activity[j].zones.c_str());
+				continue;
+			}
+			// Is the activity to deliver to this NPCTypeID ?
+			if (Task->Activity[j].DeliverToNPC != NPCTypeID)
+				continue;
+			// Is the activity related to these items ?
+			//
+			if ((Task->Activity[j].Type == ActivityGiveCash) && Cash) {
+				// TODO: shared tasks for Cash ...
+				Log(Logs::General, Logs::Tasks, "[UPDATE] Increment on GiveCash");
+				Ret = true;
+			} else {
+				for (auto &k : Items) {
+					switch (Task->Activity[j].GoalMethod) {
+
+					case METHODSINGLEID:
+						if (Task->Activity[j].GoalID != k->GetID())
+							continue;
+						break;
+
+					case METHODLIST:
+						if (!taskmanager->GoalListManager.IsInList(Task->Activity[j].GoalID,
+											   k->GetID()))
+							continue;
+						break;
+
+					default:
+						// If METHODQUEST, don't update the activity here
+						continue;
+					}
+					// We found an active task related to this item, so increment the done count
+					Log(Logs::General, Logs::Tasks, "[UPDATE] SendActivityUpdate on GiveItem");
+					ActiveSharedTask->SendActivityUpdate(j, k->GetCharges() <= 0 ? 1 : k->GetCharges());
+					Ret = true;
+				}
+			}
+		}
+	}
+
 	return Ret;
 }
 
+// this needs to change, doens't work right TODO shared tasks
 void ClientTaskState::UpdateTasksOnTouch(Client *c, int ZoneID)
 {
 	// If the client has no tasks, there is nothing further to check.
@@ -3890,18 +4137,65 @@ void SharedTaskState::MemberEnterZone(Mob *player)
 }
 
 /*
+ * For shared tasks, kill events are the only ones that we need special care for
+ * The rest we just hook into the normal functions
+ */
+void SharedTaskState::UpdateTaskOnKill(Client *c, int NPCTypeID)
+{
+	Log(Logs::General, Logs::Tasks, "[UPDATE] SharedTaskState::UpdateTaskOnKill for NPCTypeID: %d", NPCTypeID);
+	int activity_id = 0;
+
+	auto task = taskmanager->Tasks[task_id];
+
+	if (task == nullptr) // hmm
+		return;
+
+	for (int i = 0; i < task->ActivityCount; ++i) {
+		// We are not interested in completed or hidden activities
+		if (activity.Activity[i].State != ActivityActive)
+			continue;
+		// We are only interested in Kill activities
+		if (task->Activity[i].Type != ActivityKill)
+			continue;
+		// Is there a zone restriction on the activity ?
+		if (!task->Activity[i].CheckZone(zone->GetZoneID())) {
+			Log(Logs::General, Logs::Tasks,
+			    "[UPDATE] Char: %s Task: %i, Activity %i, Activity type %i for NPC %i failed zone check",
+			    c->GetName(), task_id, i, ActivityKill, NPCTypeID);
+			continue;
+		}
+		// Is the activity to kill this type of NPC ?
+		switch (task->Activity[i].GoalMethod) {
+		case METHODSINGLEID:
+			if (task->Activity[i].GoalID != NPCTypeID)
+				continue;
+			break;
+		case METHODLIST:
+			if (!taskmanager->GoalListManager.IsInList(task->Activity[i].GoalID, NPCTypeID))
+				continue;
+			break;
+		default:
+			// If METHODQUEST, don't update the activity here
+			continue;
+		}
+		Log(Logs::General, Logs::Tasks, "[UPDATE] Calling SendActivityUpdate for OnKill");
+		SendActivityUpdate(i);
+	}
+}
+
+/*
  * We tell world we had an event that matched an activity
  * This should really be all we need to tell world. World mostly needs to handle
  * cases like multiple events firing at once (in different zones) and making
  * sure we don't update past the count (events will be thrown out in that case)
  */
-void SharedTaskState::SendActivityUpdate(int activity_id)
+void SharedTaskState::SendActivityUpdate(int activity_id, int value)
 {
 	auto pack = new ServerPacket(ServerOP_TaskActivityUpdate, sizeof(ServerSharedTaskActivity_Struct));
 	auto update = (ServerSharedTaskActivity_Struct *)pack->pBuffer;
 	update->id = id;
 	update->activity_id = activity_id;
-	update->value = 1;
+	update->value = value;
 	worldserver.SendPacket(pack);
 	safe_delete(pack);
 }

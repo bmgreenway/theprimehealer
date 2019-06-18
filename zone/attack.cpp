@@ -40,6 +40,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <stdio.h>
 #include <stdlib.h>
 #include <boost/concept_check.hpp>
+#include <set>
 
 #ifdef BOTS
 #include "bot.h"
@@ -2309,6 +2310,7 @@ bool NPC::Death(Mob* killer_mob, int32 damage, uint16 spell, EQEmu::skills::Skil
 			}
 
 			/* Send the EVENT_KILLED_MERIT event for all raid members */
+			std::set<int> processed_shared_tasks; // set of IDs we already checked
 			for (int i = 0; i < MAX_RAID_MEMBERS; i++) {
 				if (kr->members[i].member != nullptr && kr->members[i].member->IsClient()) { // If Group Member is Client
 					Client *c = kr->members[i].member;
@@ -2319,8 +2321,16 @@ bool NPC::Death(Mob* killer_mob, int32 damage, uint16 spell, EQEmu::skills::Skil
 
 					mod_npc_killed_merit(kr->members[i].member);
 
-					if (RuleB(TaskSystem, EnableTaskSystem))
+					if (RuleB(TaskSystem, EnableTaskSystem)) {
 						kr->members[i].member->UpdateTasksOnKill(GetNPCTypeID());
+						// lets say we some how have 2 different shared tasks in the same raid, we need to check each :P
+						auto shared_task = kr->members[i].member->GetSharedTask();
+						if (shared_task != nullptr) {
+							auto ret = processed_shared_tasks.insert(shared_task->GetID());
+							if (ret.second)
+								shared_task->UpdateTaskOnKill(kr->members[i].member, GetNPCTypeID());
+						}
+					}
 					PlayerCount++;
 				}
 			}
@@ -2358,6 +2368,7 @@ bool NPC::Death(Mob* killer_mob, int32 damage, uint16 spell, EQEmu::skills::Skil
 
 			/* Send the EVENT_KILLED_MERIT event and update kill tasks
 			* for all group members */
+			std::set<int> processed_shared_tasks; // set of IDs we already checked
 			for (int i = 0; i < MAX_GROUP_MEMBERS; i++) {
 				if (kg->members[i] != nullptr && kg->members[i]->IsClient()) { // If Group Member is Client
 					Client *c = kg->members[i]->CastToClient();
@@ -2368,8 +2379,16 @@ bool NPC::Death(Mob* killer_mob, int32 damage, uint16 spell, EQEmu::skills::Skil
 
 					mod_npc_killed_merit(c);
 
-					if (RuleB(TaskSystem, EnableTaskSystem))
+					if (RuleB(TaskSystem, EnableTaskSystem)) {
 						c->UpdateTasksOnKill(GetNPCTypeID());
+						// lets say we some how have 2 different shared tasks in the same raid, we need to check each :P
+						auto shared_task = kr->members[i].member->GetSharedTask();
+						if (shared_task != nullptr) {
+							auto ret = processed_shared_tasks.insert(shared_task->GetID());
+							if (ret.second)
+								shared_task->UpdateTaskOnKill(kr->members[i].member, GetNPCTypeID());
+						}
+					}
 
 					PlayerCount++;
 				}
@@ -2419,8 +2438,12 @@ bool NPC::Death(Mob* killer_mob, int32 damage, uint16 spell, EQEmu::skills::Skil
 
 			mod_npc_killed_merit(give_exp_client);
 
-			if (RuleB(TaskSystem, EnableTaskSystem))
+			if (RuleB(TaskSystem, EnableTaskSystem)) {
 				give_exp_client->UpdateTasksOnKill(GetNPCTypeID());
+				auto shared_task = give_exp_client->GetSharedTask();
+				if (shared_task != nullptr)
+					shared_task->UpdateTaskOnKill(give_exp_client, GetNPCTypeID());
+			}
 
 			// QueryServ Logging - Solo
 			if (RuleB(QueryServ, PlayerLogNPCKills)) {

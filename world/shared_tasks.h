@@ -63,7 +63,7 @@ public:
 	bool UnlockActivities();
 	inline void SetUpdated(bool in = true) { task_state.Updated = in; }
 
-	void ProcessActivityUpdate(int activity_id);
+	void ProcessActivityUpdate(int activity_id, int value);
 
 	void Save(); // save to database
 

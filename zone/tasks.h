@@ -101,17 +101,22 @@ struct SharedTaskMember {
 class SharedTaskState {
 public:
 	SharedTaskState() : locked(false) {}
-	SharedTaskState(int id, int task_id) : id(id), task_id(task_id), locked(false) { }
+	SharedTaskState(int id, int task_id) : id(id), task_id(task_id), locked(false) { activity.TaskID = task_id; }
 //	~SharedTaskState();
 
 	inline const bool IsLocked() const { return locked; }
 	inline void SetLocked(bool v) { locked = v; }
 	void LockTask(); // notified clients (if they are etc)
 
+	inline int GetID() const { return id; }
+	inline int GetTaskID() const { return task_id; }
+
 	void MemberZoned(Mob *player); // player left zone, update their pointer
 	void MemberEnterZone(Mob *player); // player entered zone, update their pointer
 
-	void SendActivityUpdate(int activity_id);
+	void UpdateTaskOnKill(Client *c, int NPCTypeID);
+
+	void SendActivityUpdate(int activity_id, int value = 1);
 
 	void AddMember(std::string name, Mob *entity = nullptr, bool leader = false)
 	{
@@ -274,6 +279,7 @@ public:
 	int NextTaskInSet(int TaskSet, int TaskID);
 	bool IsTaskRepeatable(int TaskID);
 	friend class ClientTaskState;
+	friend class SharedTaskState;
 
 	SharedTaskState *LoadSharedTask(int id, ClientTaskState *state); // loads the shared task state
 	SharedTaskState *CreateSharedTask(int id, int task_id);

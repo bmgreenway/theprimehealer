@@ -1347,7 +1347,7 @@ struct ServerSharedTaskMember_Struct { // used for various things we just need t
 struct ServerSharedTaskActivity_Struct {
 	uint32 id;
 	uint32 activity_id;
-	uint32 value; // zone -> world ignored for now (maybe amount to increase by if ever applicable) world -> zone new value of the activity
+	uint32 value; // zone -> world count we're increasing by (items can be >1) world -> zone new value of the activity
 };
 
 // error constants
