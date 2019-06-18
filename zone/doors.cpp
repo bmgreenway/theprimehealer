@@ -166,6 +166,9 @@ void Doors::HandleClick(Client* sender, uint8 trigger) {
 	auto *move_door_packet = (MoveDoor_Struct *) outapp->pBuffer;
 	move_door_packet->doorid = door_id;
 
+	if (RuleB(TaskSystem, EnableTaskSystem))
+		sender->UpdateTasksOnTouch(GetDoorDBID());
+
 	if (this->IsLDoNDoor()) {
 		if (sender) {
 			if (RuleI(Adventure, ItemIDToEnablePorts) != 0) {

@@ -1349,7 +1349,6 @@ ClientTaskState::ClientTaskState() {
 
 	ActiveTaskCount = 0;
 	LastCompletedTaskLoaded = 0;
-	CheckedTouchActivities = false;
 
 	for (int i = 0; i < MAXACTIVEQUESTS; i++) {
 		ActiveQuests[i].slot = i;
@@ -2123,12 +2122,13 @@ bool ClientTaskState::UpdateTasksOnDeliver(Client *c, std::list<EQEmu::ItemInsta
 }
 
 // this needs to change, doens't work right TODO shared tasks
-void ClientTaskState::UpdateTasksOnTouch(Client *c, int ZoneID)
+void ClientTaskState::UpdateTasksOnTouch(Client *c, int door_id)
 {
 	// If the client has no tasks, there is nothing further to check.
 
-	Log(Logs::General, Logs::Tasks, "[UPDATE] ClientTaskState::UpdateTasksOnTouch(%i)", ZoneID);
-	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY)) // could be better ...
+	Log(Logs::General, Logs::Tasks, "[UPDATE] ClientTaskState::UpdateTasksOnTouch(%i)", door_id);
+	if (!taskmanager || (ActiveTaskCount == 0 && ActiveTask.TaskID == TASKSLOTEMPTY &&
+			     ActiveSharedTask == nullptr)) // could be better ...
 		return;
 
 	// loop over the union of tasks and quests
@@ -2151,11 +2151,22 @@ void ClientTaskState::UpdateTasksOnTouch(Client *c, int ZoneID)
 			// We are only interested in touch activities
 			if (Task->Activity[j].Type != ActivityTouch)
 				continue;
-			if (Task->Activity[j].GoalMethod != METHODSINGLEID)
-				continue;
-			if (!Task->Activity[j].CheckZone(ZoneID)) {
+			if (!Task->Activity[j].CheckZone(zone->GetZoneID())) {
 				Log(Logs::General, Logs::Tasks, "[UPDATE] Char: %s Touch activity failed zone check",
 				    c->GetName());
+				continue;
+			}
+			switch (Task->Activity[j].GoalMethod) {
+			case METHODSINGLEID:
+				if (Task->Activity[j].GoalID != door_id)
+					continue;
+				break;
+			case METHODLIST:
+				if (!taskmanager->GoalListManager.IsInList(Task->Activity[j].GoalID, door_id))
+					continue;
+				break;
+			default:
+				// If METHODQUEST, don't update the activity here
 				continue;
 			}
 			// We found an active task to zone into this zone, so set done count to goal count
@@ -2163,6 +2174,45 @@ void ClientTaskState::UpdateTasksOnTouch(Client *c, int ZoneID)
 			Log(Logs::General, Logs::Tasks, "[UPDATE] Increment on Touch");
 			IncrementDoneCount(c, Task, cur_task->slot, j,
 					   Task->Activity[j].GoalCount - cur_task->Activity[j].DoneCount);
+		}
+	}
+	if (ActiveSharedTask != nullptr) {
+		auto cur_task = ActiveSharedTask->GetActivity();
+
+		auto Task = taskmanager->Tasks[cur_task->TaskID];
+
+		if (Task == nullptr)
+			return;
+
+		for (int j = 0; j < Task->ActivityCount; j++) {
+			// We are not interested in completed or hidden activities
+			if (cur_task->Activity[j].State != ActivityActive)
+				continue;
+			// We are only interested in touch activities
+			if (Task->Activity[j].Type != ActivityTouch)
+				continue;
+			if (!Task->Activity[j].CheckZone(zone->GetZoneID())) {
+				Log(Logs::General, Logs::Tasks, "[UPDATE] Char: %s Touch activity failed zone check",
+				    c->GetName());
+				continue;
+			}
+			switch (Task->Activity[j].GoalMethod) {
+			case METHODSINGLEID:
+				if (Task->Activity[j].GoalID != door_id)
+					continue;
+				break;
+			case METHODLIST:
+				if (!taskmanager->GoalListManager.IsInList(Task->Activity[j].GoalID, door_id))
+					continue;
+				break;
+			default:
+				// If METHODQUEST, don't update the activity here
+				continue;
+			}
+			// We found an active task to zone into this zone, so set done count to goal count
+			// (Only a goal count of 1 makes sense for touch activities?)
+			Log(Logs::General, Logs::Tasks, "[UPDATE] Calling SendActivityUpdate on Touch");
+			ActiveSharedTask->SendActivityUpdate(j);
 		}
 	}
 
@@ -2748,15 +2798,6 @@ void ClientTaskState::TaskPeriodicChecks(Client *c)
 			// tasks fail at the same time.
 			break;
 		}
-	}
-
-	// Check for activities that require zoning into a specific zone.
-	// This is done in this method because it gives an extra few seconds for the client screen to display
-	// the zone before we send the 'Task Activity Completed' message.
-	//
-	if (!CheckedTouchActivities) {
-		UpdateTasksOnTouch(c, zone->GetZoneID());
-		CheckedTouchActivities = true;
 	}
 }
 

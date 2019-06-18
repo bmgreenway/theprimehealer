@@ -172,7 +172,7 @@ public:
 	void UpdateTasksOnExplore(Client *c, int ExploreID);
 	bool UpdateTasksOnSpeakWith(Client *c, int NPCTypeID);
 	bool UpdateTasksOnDeliver(Client *c, std::list<EQEmu::ItemInstance*>& Items, int Cash, int NPCTypeID);
-	void UpdateTasksOnTouch(Client *c, int ZoneID);
+	void UpdateTasksOnTouch(Client *c, int door_id);
 	void ProcessTaskProximities(Client *c, float X, float Y, float Z);
 	bool TaskOutOfTime(TaskType type, int Index);
 	void TaskPeriodicChecks(Client *c);
@@ -236,7 +236,6 @@ private:
 	std::vector<int> EnabledTasks;
 	std::vector<CompletedTaskInformation> CompletedTasks;
 	int LastCompletedTaskLoaded;
-	bool CheckedTouchActivities;
 };
 
 struct TaskReplayGroups {

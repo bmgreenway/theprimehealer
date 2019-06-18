@@ -1021,6 +1021,7 @@ public:
 	inline void UpdateTasksOnExplore(int ExploreID) { if(taskstate) taskstate->UpdateTasksOnExplore(this, ExploreID); }
 	inline bool UpdateTasksOnSpeakWith(int NPCTypeID) { if(taskstate) return taskstate->UpdateTasksOnSpeakWith(this, NPCTypeID); else return false; }
 	inline bool UpdateTasksOnDeliver(std::list<EQEmu::ItemInstance*>& Items, int Cash, int NPCTypeID) { if (taskstate) return taskstate->UpdateTasksOnDeliver(this, Items, Cash, NPCTypeID); else return false; }
+	inline void UpdateTasksOnTouch(int door_id) { if(taskstate) taskstate->UpdateTasksOnTouch(this, door_id); }
 	inline void TaskSetSelector(Mob *mob, int TaskSetID, bool shared = false) { if(taskmanager) taskmanager->TaskSetSelector(this, taskstate, mob, TaskSetID, shared); }
 	inline void TaskQuestSetSelector(Mob *mob, int count, int *tasks, bool shared = false) { if(taskmanager) taskmanager->TaskQuestSetSelector(this, taskstate, mob, count, tasks, shared); }
 	inline void EnableTask(int TaskCount, int *TaskList) { if(taskstate) taskstate->EnableTask(CharacterID(), TaskCount, TaskList); }
