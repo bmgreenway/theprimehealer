@@ -100,8 +100,8 @@ struct SharedTaskMember {
 
 class SharedTaskState {
 public:
-	SharedTaskState() : locked(false) {}
-	SharedTaskState(int id, int task_id) : id(id), task_id(task_id), locked(false) { activity.TaskID = task_id; }
+	SharedTaskState() : locked(false), completed(false) {}
+	SharedTaskState(int id, int task_id) : id(id), task_id(task_id), locked(false), completed(false) { activity.TaskID = task_id; }
 //	~SharedTaskState();
 
 	inline const bool IsLocked() const { return locked; }
@@ -110,6 +110,9 @@ public:
 
 	inline int GetID() const { return id; }
 	inline int GetTaskID() const { return task_id; }
+
+	inline void SetCompleted(bool in) { completed = in; }
+	inline bool GetCompleted() const { return completed; }
 
 	void MemberZoned(Mob *player); // player left zone, update their pointer
 	void MemberEnterZone(Mob *player); // player entered zone, update their pointer
@@ -140,6 +143,7 @@ private:
 	std::string leader_name;
 	ClientTaskInformation activity;
 	bool locked;
+	bool completed;
 };
 
 class ClientTaskState {
@@ -199,7 +203,6 @@ public:
 	friend class TaskManager;
 
 private:
-	bool UnlockActivities(ClientTaskInformation &task_info);
 	void RecordCompletedTasks(int char_id, ClientTaskInformation &task_info);
 	void IncrementDoneCount(Client *c, TaskInformation *Task, int TaskIndex, int ActivityID, int Count = 1, bool ignore_quest_update = false);
 	inline ClientTaskInformation *GetClientTaskInfo(TaskType type, int index)
@@ -277,10 +280,11 @@ public:
 	int LastTaskInSet(int TaskSet);
 	int NextTaskInSet(int TaskSet, int TaskID);
 	bool IsTaskRepeatable(int TaskID);
+	bool UnlockActivities(ClientTaskInformation &task_info);
 	friend class ClientTaskState;
 	friend class SharedTaskState;
 
-	SharedTaskState *LoadSharedTask(int id, ClientTaskState *state); // loads the shared task state
+	SharedTaskState *LoadSharedTask(int id); // loads the shared task state
 	SharedTaskState *CreateSharedTask(int id, int task_id);
 	SharedTaskState *GetSharedTask(int id);
 

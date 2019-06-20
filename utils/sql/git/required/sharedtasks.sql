@@ -32,6 +32,7 @@ CREATE TABLE `shared_task_state` (
 	`task_id` INT NOT NULL,
 	`accepted_time` INT NOT NULL,
 	`is_locked` TINYINT NOT NULL DEFAULT '0',
+	`is_completed` TINYINT NOT NULL DEFAULT '0',
 	PRIMARY KEY(`id`)
 );
 CREATE TABLE `shared_task_activities` (

@@ -31,8 +31,8 @@ struct SharedTaskMemberList {
 
 class SharedTask {
 public:
-	SharedTask() : id(0), task_id(0), locked(false) {}
-	SharedTask(int id, int task_id) : id(id), task_id(task_id), locked(false) {}
+	SharedTask() : id(0), task_id(0), locked(false), completed(false) {}
+	SharedTask(int id, int task_id) : id(id), task_id(task_id), locked(false), completed(false) {}
 	~SharedTask() {}
 
 	void AddMember(std::string name, ClientListEntry *cle = nullptr, int char_id = 0, bool leader = false)
@@ -63,6 +63,11 @@ public:
 	bool UnlockActivities();
 	inline void SetUpdated(bool in = true) { task_state.Updated = in; }
 
+	inline void SetCompleted(bool in) { completed = in; }
+	inline bool GetCompleted() const { return completed; }
+
+	bool TaskCompleted();
+
 	void ProcessActivityUpdate(int activity_id, int value);
 
 	void Save(); // save to database
@@ -78,6 +83,7 @@ private:
 	int id; // id we have in our map
 	int task_id; // ID of the task we're on
 	bool locked;
+	bool completed;
 	std::string leader_name;
 	SharedTaskMemberList members;
 	std::vector<int> char_ids; // every char id of someone to be locked out, different in case they leave/removed

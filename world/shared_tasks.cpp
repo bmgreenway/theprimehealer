@@ -394,7 +394,8 @@ bool SharedTaskManager::LoadSharedTaskState()
 {
 	// one may think we should clean up expired tasks, but we don't just in case world is booting back up after a crash
 	// we will clean them up in the normal process loop so zones get told to clean up
-	std::string query = "SELECT `id`, `task_id`, `accepted_time`, `is_locked` FROM `shared_task_state`";
+	std::string query =
+	    "SELECT `id`, `task_id`, `accepted_time`, `is_locked`, `is_completed` FROM `shared_task_state`";
 	auto results = database.QueryDatabase(query);
 
 	if (results.Success() && results.RowCount() > 0) {
@@ -408,6 +409,7 @@ bool SharedTaskManager::LoadSharedTaskState()
 			task.SetTaskID(atoi(row[1]));
 			task.SetAcceptedTime(atoi(row[2]));
 			task.SetLocked(atoi(row[3]) != 0);
+			task.SetCompleted(atoi(row[4]) != 0);
 		}
 	}
 
@@ -558,9 +560,9 @@ void SharedTask::Save()
 	fmt::MemoryWriter out; // queries where we loop over stuff
 
 	if (task_state.Updated) {
-		query = fmt::format(
-		    "REPLACE INTO shared_task_state (id, task_id, accepted_time, is_locked) VALUES ({}, {}, {}, {:d})",
-		    id, task_id, GetAcceptedTime(), locked);
+		query = fmt::format("REPLACE INTO shared_task_state (id, task_id, accepted_time, is_locked, "
+				    "is_completed) VALUES ({}, {}, {}, {:d}. {:d})",
+				    id, task_id, GetAcceptedTime(), locked, completed);
 		auto res = database.QueryDatabase(query);
 		if (!res.Success())
 			Log(Logs::General, Logs::Error, ERR_MYSQLERROR, res.ErrorMessage().c_str());
@@ -650,6 +652,24 @@ bool SharedTask::UnlockActivities()
 }
 
 /*
+ * Returns true if the task is completed
+ */
+bool SharedTask::TaskCompleted()
+{
+	auto task = shared_tasks.GetTaskInformation(task_id);
+
+	if (task == nullptr)
+		return false;
+
+	for (int i = 0; i < task->ActivityCount; ++i) {
+		if (!task->Activity[i].Optional && task_state.Activity[i].State != ActivityCompleted)
+			return false;
+	}
+
+	return true;
+}
+
+/*
  * We just need to verify the activity can be updated, if it can, we tell zones
  * to do so. Update just means ticking up a count.
  *
@@ -674,6 +694,8 @@ void SharedTask::ProcessActivityUpdate(int activity_id, int value)
 
 	task_state.Activity[activity_id].DoneCount =
 	    std::min(task_state.Activity[activity_id].DoneCount + value, task_info->Activity[activity_id].GoalCount);
+	if (task_state.Activity[activity_id].DoneCount >= task_info->Activity[activity_id].GoalCount)
+		task_state.Activity[activity_id].State = ActivityCompleted;
 	task_state.Activity[activity_id].Updated = true;
 
 	// we just fire off to all zones, fuck it!
@@ -686,5 +708,16 @@ void SharedTask::ProcessActivityUpdate(int activity_id, int value)
 	safe_delete(pack);
 
 	Save();
+
+	if (TaskCompleted()) {
+		SetCompleted(true);
+		SetUpdated(true);
+		auto pack = new ServerPacket(ServerOP_TaskCompleted, sizeof(uint32));
+		pack->WriteUInt32(id);
+		zoneserver_list.SendPacket(pack);
+		safe_delete(pack);
+		Save(); // since Save only saves stuff where update flag has been set, this isn't too bad to call again
+	}
+
 }
 

@@ -764,10 +764,10 @@ bool TaskManager::LoadClientState(Client *c, ClientTaskState *state)
 	}
 
 	if (state->ActiveTask.TaskID != TASKSLOTEMPTY)
-		state->UnlockActivities(state->ActiveTask);
+		taskmanager->UnlockActivities(state->ActiveTask);
 	for (int i = 0; i < MAXACTIVEQUESTS; i++)
 		if (state->ActiveQuests[i].TaskID != TASKSLOTEMPTY)
-			state->UnlockActivities(state->ActiveQuests[i]);
+			taskmanager->UnlockActivities(state->ActiveQuests[i]);
 
 	Log(Logs::General, Logs::Tasks, "[CLIENTLOAD] LoadClientState for Character ID %d DONE!", characterID);
 	return true;
@@ -1387,7 +1387,7 @@ static void DeleteCompletedTaskFromDatabase(int charID, int taskID) {
 	Log(Logs::General, Logs::Tasks, "[UPDATE] Delete query %s", query.c_str());
 }
 
-bool ClientTaskState::UnlockActivities(ClientTaskInformation &task_info)
+bool TaskManager::UnlockActivities(ClientTaskInformation &task_info)
 {
 	bool AllActivitiesComplete = true;
 
@@ -2252,7 +2252,7 @@ void ClientTaskState::IncrementDoneCount(Client *c, TaskInformation *Task, int T
 		// Flag the activity as complete
 		info->Activity[ActivityID].State = ActivityCompleted;
 		// Unlock subsequent activities for this task
-		bool TaskComplete = UnlockActivities(*info);
+		bool TaskComplete = taskmanager->UnlockActivities(*info);
 		if (TaskComplete)
 			RecordCompletedTasks(c->CharacterID(), *info);
 		Log(Logs::General, Logs::Tasks, "[UPDATE] TaskCompleted is %i", TaskComplete);
@@ -3345,9 +3345,10 @@ void TaskManager::SendActiveTaskDescription(Client *c, int TaskID, ClientTaskInf
 	safe_delete(outapp);
 }
 
-SharedTaskState *TaskManager::LoadSharedTask(int id, ClientTaskState *state)
+SharedTaskState *TaskManager::LoadSharedTask(int id)
 {
-	std::string query = fmt::format("SELECT task_id, accepted_time, is_locked FROM shared_task_state WHERE id = {}", id);
+	std::string query = fmt::format(
+	    "SELECT task_id, accepted_time, is_locked, is_completed FROM shared_task_state WHERE id = {}", id);
 	auto results = database.QueryDatabase(query);
 
 	const char *ERR_MYSQLERROR = "[TASKS]Error in TaskManager::LoadSharedTask: %s";
@@ -3374,6 +3375,7 @@ SharedTaskState *TaskManager::LoadSharedTask(int id, ClientTaskState *state)
 	task_activity->CurrentStep = -1;
 
 	task_state->SetLocked(atoi(row[2]) != 0);
+	task_state->SetCompleted(atoi(row[3]) != 0);
 
 	query = fmt::format("SELECT activity_id, done_count, completed FROM shared_task_activities WHERE shared_task_id = {}", id);
 	results = database.QueryDatabase(query);
@@ -3404,7 +3406,7 @@ SharedTaskState *TaskManager::LoadSharedTask(int id, ClientTaskState *state)
 	for (auto row = results.begin(); row != results.end(); ++row)
 		task_state->AddMember(row[0], nullptr, atoi(row[1]) != 0);
 
-	state->UnlockActivities(*task_activity);
+	taskmanager->UnlockActivities(*task_activity);
 
 	return task_state;
 }
@@ -3698,7 +3700,7 @@ void ClientTaskState::AcceptNewTask(Client *c, int TaskID, int NPCID, bool enfor
 		active_slot->Activity[i].Updated = true;
 	}
 
-	UnlockActivities(*active_slot);
+	taskmanager->UnlockActivities(*active_slot);
 
 	if (task->type == TaskType::Quest)
 		ActiveTaskCount++;
@@ -3855,7 +3857,7 @@ void ClientTaskState::AcceptNewSharedTask(Client *c, int TaskID, int NPCID, int 
 
 	// TODO: figure out packet order
 	// unsure if we unlock now packet wise, just copying normal tasks for now
-	UnlockActivities(*task_activity);
+	taskmanager->UnlockActivities(*task_activity);
 
 	taskmanager->SendSingleActiveTaskToClient(c, *task_activity, false, true);
 	c->Message(0, "You have been assigned the task '%s'.", taskmanager->Tasks[TaskID]->Title.c_str());
@@ -3910,7 +3912,7 @@ void ClientTaskState::AddToSharedTask(Client *c, int TaskID)
 	Log(Logs::General, Logs::Tasks, "Adding client (%s:%d) to shared task %d", c->GetName(), c->CharacterID(), TaskID);
 	auto task = taskmanager->GetSharedTask(TaskID);
 	if (!task)
-		task = taskmanager->LoadSharedTask(TaskID, this);
+		task = taskmanager->LoadSharedTask(TaskID);
 
 	if (!task) {// FUCK
 		Log(Logs::General, Logs::Tasks, "Failed to load shared task %d", TaskID);
@@ -4269,5 +4271,30 @@ void SharedTaskState::SendMembersList(Client *to) const
 void SharedTaskState::UpdateActivity(int activity_id, int value)
 {
 	activity.Activity[activity_id].DoneCount = value;
+	// TODO: Quest trigger EVENT_TASK_UPDATE
+
+	auto Task = taskmanager->Tasks[task_id];
+
+	if (activity.Activity[activity_id].DoneCount >= Task->Activity[activity_id].GoalCount) {
+		activity.Activity[activity_id].State = ActivityCompleted;
+		bool task_completed = taskmanager->UnlockActivities(activity);
+
+		for (auto &&m : members) {
+			if (m.entity && m.entity->IsClient()) {
+				auto c = m.entity->CastToClient();
+				c->SendTaskActivityComplete(activity.TaskID, activity_id, 0, TaskType::Shared);
+				taskmanager->SendSingleActiveTaskToClient(c, activity, task_completed, false);
+				c->Message(0, "Your task '%s' has been updated.", Task->Title.c_str());
+				// TODO: EVENT_TASK_STAGE_COMPLETE
+			}
+		}
+	} else {
+		for (auto &&m : members) {
+			// could be better :S
+			if (m.entity && m.entity->IsClient())
+				taskmanager->SendTaskActivityLong(m.entity->CastToClient(), task_id, activity_id, 0,
+								  Task->Activity[activity_id].Optional);
+		}
+	}
 }
 

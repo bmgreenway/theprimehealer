@@ -160,6 +160,7 @@
 #define ServerOP_TaskZoneCreated	0x0305 // zone -> world. Something didn't go wrong creating the new task! Now World needs to tell other players to join world -> zone response to tell someone to join
 #define ServerOP_TaskZoneFailed		0x0306 // zone -> world. Something went wrong above ABORT
 #define ServerOP_TaskActivityUpdate	0x0307 // zone -> world. Is this valid update? world -> zone update activity
+#define ServerOP_TaskCompleted		0x0308 // world -> zone. We completed! Do stuff zone!
 
 #define ServerOP_EncapPacket		0x2007	// Packet within a packet
 #define ServerOP_WorldListUpdate	0x2008
