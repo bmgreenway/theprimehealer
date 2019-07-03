@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fmt/format.h>
 
 // Disgrace: for windows compile
 #ifdef _WINDOWS

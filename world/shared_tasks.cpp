@@ -557,7 +557,7 @@ void SharedTask::Save()
 	const char *ERR_MYSQLERROR = "[TASKS]Error in TaskManager::SaveClientState %s";
 	database.TransactionBegin();
 	std::string query; // simple queries
-	fmt::MemoryWriter out; // queries where we loop over stuff
+	fmt::basic_memory_buffer<char> out; // queries where we loop over stuff
 
 	if (task_state.Updated) {
 		query = fmt::format("REPLACE INTO shared_task_state (id, task_id, accepted_time, is_locked, "
@@ -572,23 +572,24 @@ void SharedTask::Save()
 
 	int activity_count = 0;
 	int max = shared_tasks.GetTaskActivityCount(task_id);
-	out.write("REPLACE INTO shared_task_activities (shared_task_id, activity_id, done_count, completed) VALUES ");
+	fmt::format_to(
+	    out, "REPLACE INTO shared_task_activities (shared_task_id, activity_id, done_count, completed) VALUES ");
 	for (int i = 0; i < max; ++i) {
 		if (!task_state.Activity[i].Updated)
 			continue;
 
 		if (activity_count == 0)
-			out.write("({}, {}, {}, {:d})", id, i, task_state.Activity[i].DoneCount,
-				  task_state.Activity[i].State == ActivityCompleted);
+			fmt::format_to(out, "({}, {}, {}, {:d})", id, i, task_state.Activity[i].DoneCount,
+				       task_state.Activity[i].State == ActivityCompleted);
 		else
-			out.write(", ({}, {}, {}, {:d})", id, i, task_state.Activity[i].DoneCount,
-				  task_state.Activity[i].State == ActivityCompleted);
+			fmt::format_to(out, ", ({}, {}, {}, {:d})", id, i, task_state.Activity[i].DoneCount,
+				       task_state.Activity[i].State == ActivityCompleted);
 		++activity_count;
 	}
 
 	// we got stuff to write
 	if (activity_count != 0) {
-		query = out.str();
+		query = fmt::to_string(out);
 		out.clear();
 		auto res = database.QueryDatabase(query);
 		if (!res.Success()) {
@@ -603,18 +604,18 @@ void SharedTask::Save()
 		query = fmt::format("DELETE FROM `shared_task_members` WHERE `shared_task_id` = {}", id);
 		database.QueryDatabase(query);
 
-		out.write("INSERT INTO `shared_task_members` (shared_task_id, character_id, character_name, is_leader) "
-			  "VALUES ");
+		fmt::format_to(out, "INSERT INTO `shared_task_members` (shared_task_id, character_id, character_name, "
+				    "is_leader) VALUES ");
 		bool first = true;
 		for (auto &&m : members.list) {
 			if (first) {
-				out.write("({}, {}, \"{}\", {:d})", id, m.char_id, m.name, m.leader);
+				fmt::format_to(out, "({}, {}, \"{}\", {:d})", id, m.char_id, m.name, m.leader);
 				first = false;
 			} else {
-				out.write(", ({}, {}, \"{}\", {:d})", id, m.char_id, m.name, m.leader);
+				fmt::format_to(out, ", ({}, {}, \"{}\", {:d})", id, m.char_id, m.name, m.leader);
 			}
 		}
-		query = out.str();
+		query = fmt::to_string(out);
 		out.clear();
 		auto res = database.QueryDatabase(query);
 		if (!res.Success())
