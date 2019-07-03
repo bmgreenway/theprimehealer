@@ -342,7 +342,7 @@ public:
 	void	DivergeCharacterInvSnapshotFromInventory(uint32 character_id, uint32 timestamp, std::list<std::pair<int16, uint32>> &compare_list);
 	void	DivergeCharacterInventoryFromInvSnapshot(uint32 character_id, uint32 timestamp, std::list<std::pair<int16, uint32>> &compare_list);
 	bool	RestoreCharacterInvSnapshot(uint32 character_id, uint32 timestamp);
-	
+
 	/* Corpses  */
 	bool		DeleteItemOffCharacterCorpse(uint32 db_id, uint32 equip_slot, uint32 item_id);
 	uint32		GetCharacterCorpseItemCount(uint32 corpse_id);
@@ -386,7 +386,21 @@ public:
 	bool	LoadAlternateAdvancement(Client *c);
 
 	/* Zone related   */
-	bool		GetZoneCFG(uint32 zoneid, uint16 instance_id, NewZone_Struct *data, bool &can_bind, bool &can_combat, bool &can_levitate, bool &can_castoutdoor, bool &is_city, bool &is_hotzone, bool &allow_mercs, uint8 &zone_type, int &ruleset, char **map_filename);
+	bool		GetZoneCFG(
+		uint32 zoneid,
+		uint16 instance_id,
+		NewZone_Struct *data,
+		bool &can_bind,
+		bool &can_combat,
+		bool &can_levitate,
+		bool &can_castoutdoor,
+		bool &is_city,
+		bool &is_hotzone,
+		bool &allow_mercs,
+		double &max_movement_update_range,
+		uint8 &zone_type,
+		int &ruleset,
+		char **map_filename);
 	bool		SaveZoneCFG(uint32 zoneid, uint16 instance_id, NewZone_Struct* zd);
 	bool		LoadStaticZonePoints(LinkedList<ZonePoint*>* zone_point_list,const char* zonename, uint32 version);
 	bool		UpdateZoneSafeCoords(const char* zonename, const glm::vec3& location);
