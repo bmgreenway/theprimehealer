@@ -165,6 +165,7 @@ public:
 			return it->second;
 		return nullptr;
 	}
+	std::list<Client *> GetClientListByName(const char *name);
 	Client *GetClientByName(const char *name);
 	Client *GetClientByAccID(uint32 accid);
 	inline Client *GetClientByID(uint16 id)

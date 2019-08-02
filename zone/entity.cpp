@@ -1679,6 +1679,18 @@ void EntityList::DuelMessage(Mob *winner, Mob *loser, bool flee)
 	}
 }
 
+std::list<Client *> EntityList::GetClientListByName(const char *checkname)
+{
+	std::list<Client *> found_clients;
+	auto it = client_list.begin();
+	while (it != client_list.end()) {
+		if (strcasecmp(it->second->GetName(), checkname) == 0)
+			found_clients.push_back(it->second);
+		++it;
+	}
+	return found_clients;
+}
+
 Client *EntityList::GetClientByName(const char *checkname)
 {
 	auto it = client_list.begin();

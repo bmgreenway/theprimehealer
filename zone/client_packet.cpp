@@ -501,6 +501,17 @@ int Client::HandlePacket(const EQApplicationPacket *app)
 // Finish client connecting state
 void Client::CompleteConnect()
 {
+	if (conn_state >= ClientConnectFinished) {
+		Log(
+			Logs::General,
+			Logs::Client_Login,
+			"Client::CompleteConnect() called again for '%s' @ '%s:%u'",
+			GetName(),
+			eqs->GetRemoteAddr().c_str(),
+			eqs->GetRemotePort()
+		);
+		return;
+	}
 
 	UpdateWho();
 	client_state = CLIENT_CONNECTED;
@@ -954,6 +965,18 @@ void Client::Handle_Connect_OP_ClientError(const EQApplicationPacket *app)
 
 void Client::Handle_Connect_OP_ClientReady(const EQApplicationPacket *app)
 {
+	if (conn_state >= ClientReadyReceived) {
+		Log(
+			Logs::General,
+			Logs::Client_Login,
+			"OP_ClientReady called again for '%s' @ '%s:%u'",
+			GetName(),
+			eqs->GetRemoteAddr().c_str(),
+			eqs->GetRemotePort()
+		);
+		return;
+	}
+	
 	conn_state = ClientReadyReceived;
 	if (!Spawned())
 		SendZoneInPackets();
@@ -971,6 +994,18 @@ void Client::Handle_Connect_OP_ClientUpdate(const EQApplicationPacket *app)
 
 void Client::Handle_Connect_OP_ReqClientSpawn(const EQApplicationPacket *app)
 {
+	if (conn_state >= ClientSpawnRequested) {
+		Log(
+			Logs::General,
+			Logs::Client_Login,
+			"OP_ReqClientSpawn called again for '%s' @ '%s:%u'",
+			GetName(),
+			eqs->GetRemoteAddr().c_str(),
+			eqs->GetRemotePort()
+		);
+		return;
+	}
+
 	conn_state = ClientSpawnRequested;
 
 	auto outapp = new EQApplicationPacket;
@@ -1016,6 +1051,18 @@ void Client::Handle_Connect_OP_ReqClientSpawn(const EQApplicationPacket *app)
 
 void Client::Handle_Connect_OP_ReqNewZone(const EQApplicationPacket *app)
 {
+	if (conn_state >= NewZoneRequested) {
+		Log(
+			Logs::General,
+			Logs::Client_Login,
+			"OP_ReqNewZone called again for '%s' @ '%s:%u'",
+			GetName(),
+			eqs->GetRemoteAddr().c_str(),
+			eqs->GetRemotePort()
+		);
+		return;
+	}
+	
 	conn_state = NewZoneRequested;
 
 	EQApplicationPacket* outapp = nullptr;
@@ -1146,6 +1193,18 @@ void Client::Handle_Connect_OP_ZoneComplete(const EQApplicationPacket *app)
 
 void Client::Handle_Connect_OP_ZoneEntry(const EQApplicationPacket *app)
 {
+	if (conn_state >= ReceivedZoneEntry) {
+		Log(
+			Logs::General,
+			Logs::Client_Login,
+			"OP_ZoneEntry called again for '%s' @ '%s:%u'",
+			GetName(),
+			eqs->GetRemoteAddr().c_str(),
+			eqs->GetRemotePort()
+		);
+		return;
+	}
+	
 	if (app->size != sizeof(ClientZoneEntry_Struct))
 		return;
 	ClientZoneEntry_Struct *cze = (ClientZoneEntry_Struct *)app->pBuffer;
@@ -1164,27 +1223,38 @@ void Client::Handle_Connect_OP_ZoneEntry(const EQApplicationPacket *app)
 	/* Antighost code
 	tmp var is so the search doesnt find this object
 	*/
-	Client* client = entity_list.GetClientByName(cze->char_name);
+	auto existing_clients = entity_list.GetClientListByName(cze->char_name);
+	
 	if (!zone->GetAuth(ip, cze->char_name, &WID, &account_id, &character_id, &admin, lskey, &tellsoff)) {
 		Log(Logs::General, Logs::Client_Login, "%s failed zone auth check.", cze->char_name);
-		if (nullptr != client) {
-			client->Save();
-			client->Kick("Failed auth check");
+		for (auto iter : existing_clients) {
+			if (iter->conn_state == ClientConnectFinished)
+				iter->Save();
+			iter->Kick("Failed auth check");
 		}
+		//ret = false; // TODO: Can we tell the client to get lost in a good way
+		client_state = CLIENT_KICKED;
+		
 		return;
 	}
 
-	strcpy(name, cze->char_name);
 	/* Check for Client Spoofing */
-	if (client != 0) {
+	for (auto iter : existing_clients) {
+		if (iter == this)
+			continue;
+
 		struct in_addr ghost_addr;
-		ghost_addr.s_addr = eqs->GetRemoteIP();
+		ghost_addr.s_addr = iter->eqs->GetRemoteIP();
 
 		Log(Logs::General, Logs::Error, "Ghosting client: Account ID:%i Name:%s Character:%s IP:%s",
-			client->AccountID(), client->AccountName(), client->GetName(), inet_ntoa(ghost_addr));
-		client->Save();
-		client->Disconnect();
+			iter->AccountID(), iter->AccountName(), iter->GetName(), inet_ntoa(ghost_addr));
+
+		if (iter->conn_state == ClientConnectFinished)
+			iter->Save();
+		iter->Disconnect();
 	}
+
+	strcpy(name, cze->char_name);
 
 	uint32 pplen = 0;
 	EQApplicationPacket* outapp = nullptr;
