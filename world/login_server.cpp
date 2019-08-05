@@ -105,15 +105,11 @@ void LoginServer::ProcessUsertoWorldReq(uint16_t opcode, EQ::Net::Packet &p) {
 		return;
 	}
 
-	if (RuleB(World, DisallowDuplicateAccountLogins)) {
-		auto cle = client_list.FindCLEByLSID(utwr->lsaccountid);
-		if (cle != nullptr) {
-			auto status = cle->GetOnline();
-			if (CLE_Status_Never != status && CLE_Status_Offline != status) {
-				utwrs->response = UserToWorldStatusAlreadyOnline;
-				SendPacket(&outpack);
-				return;
-			}
+	if (RuleB(World, EnforceCharacterLimitAtLogin)) {
+		if (client_list.IsAccountInGame(utwr->lsaccountid)) {
+			utwrs->response = UserToWorldStatusAlreadyOnline;
+			SendPacket(&outpack);
+			return;
 		}
 	}
 
