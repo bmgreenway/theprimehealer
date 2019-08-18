@@ -22,5 +22,10 @@ IPathfinder::IPath PathfinderNull::FindPath(const glm::vec3 &start, const glm::v
 
 glm::vec3 PathfinderNull::GetRandomLocation(const glm::vec3 &start)
 {
-	return glm::vec3(0.0f);
+	return start;
+}
+
+glm::vec3 PathfinderNull::GetRandomLocationInRoambox(const glm::vec3 &start, const glm::vec2 &min, const glm::vec2 &max, float dist)
+{
+	return start;
 }

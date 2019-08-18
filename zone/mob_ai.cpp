@@ -1586,26 +1586,36 @@ void NPC::AI_DoMovement() {
 
 		// Set a new destination
 		if (!IsMoving() && time_until_can_move < Timer::GetCurrentTime()) {
-			auto move_x = static_cast<float>(zone->random.Real(-roambox_distance, roambox_distance));
-			auto move_y = static_cast<float>(zone->random.Real(-roambox_distance, roambox_distance));
+			if (zone->pathing) {
+				auto pos = zone->pathing->GetRandomLocationInRoambox(GetPosition(), glm::vec2(roambox_min_x, roambox_min_y), glm::vec2(roambox_max_x, roambox_max_y), roambox_distance);
 
-			roambox_destination_x = EQEmu::Clamp((GetX() + move_x), roambox_min_x, roambox_max_x);
-			roambox_destination_y = EQEmu::Clamp((GetY() + move_y), roambox_min_y, roambox_max_y);
-
-			/**
-			 * If our roambox was configured with large distances, chances of hitting the min or max end of
-			 * the clamp is high, this causes NPC's to gather on the border of a box, to reduce clustering
-			 * either lower the roambox distance or the code will do a simple random between min - max when it
-			 * hits the min or max of the clamp
-			 */
-			if (roambox_destination_x == roambox_min_x || roambox_destination_x == roambox_max_x) {
-				roambox_destination_x = static_cast<float>(zone->random.Real(roambox_min_x, roambox_max_x));
+				roambox_destination_x = pos.x;
+				roambox_destination_y = pos.y;
+				roambox_destination_z = pos.z;
 			}
+			else {
+				auto move_x = static_cast<float>(zone->random.Real(-roambox_distance, roambox_distance));
+				auto move_y = static_cast<float>(zone->random.Real(-roambox_distance, roambox_distance));
+				roambox_destination_z = 0.0;
 
-			if (roambox_destination_y == roambox_min_y || roambox_destination_y == roambox_max_y) {
-				roambox_destination_y = static_cast<float>(zone->random.Real(roambox_min_y, roambox_max_y));
+				roambox_destination_x = EQEmu::Clamp((GetX() + move_x), roambox_min_x, roambox_max_x);
+				roambox_destination_y = EQEmu::Clamp((GetY() + move_y), roambox_min_y, roambox_max_y);
+
+				/**
+				 * If our roambox was configured with large distances, chances of hitting the min or max end of
+				 * the clamp is high, this causes NPC's to gather on the border of a box, to reduce clustering
+				 * either lower the roambox distance or the code will do a simple random between min - max when it
+				 * hits the min or max of the clamp
+				 */
+				if (roambox_destination_x == roambox_min_x || roambox_destination_x == roambox_max_x) {
+					roambox_destination_x = static_cast<float>(zone->random.Real(roambox_min_x, roambox_max_x));
+				}
+
+				if (roambox_destination_y == roambox_min_y || roambox_destination_y == roambox_max_y) {
+					roambox_destination_y = static_cast<float>(zone->random.Real(roambox_min_y, roambox_max_y));
+				}
 			}
-
+			
 			/**
 			 * If mob was not spawned in water, let's not randomly roam them into water
 			 * if the roam box was sloppily configured
@@ -1617,7 +1627,7 @@ void NPC::AI_DoMovement() {
 						roambox_destination_y,
 						(m_Position.z - 15)
 					);
-
+			
 					/**
 					 * If someone brought us into water when we naturally wouldn't path there, return to spawn
 					 */
@@ -1625,24 +1635,17 @@ void NPC::AI_DoMovement() {
 						roambox_destination_x = m_SpawnPoint.x;
 						roambox_destination_y = m_SpawnPoint.y;
 					}
-
+			
 					if (zone->watermap->InLiquid(position)) {
 						Log(Logs::Detail,
 							Logs::NPCRoamBox, "%s | My destination is in water and I don't belong there!",
 							this->GetCleanName());
-
+			
 						return;
 					}
 				}
 			}
-
-			roambox_destination_z = 0;
-			/*
-			if (zone->zonemap) {
-				roambox_destination_z = FindGroundZ(roambox_destination_x, roambox_destination_y, this->GetZOffset());
-			}
-				*/
-
+			
 			Log(Logs::Detail,
 				Logs::NPCRoamBox,
 				"Calculate | NPC: %s distance %.3f | min_x %.3f | max_x %.3f | final_x %.3f | min_y %.3f | max_y %.3f | final_y %.3f",
@@ -1655,7 +1658,7 @@ void NPC::AI_DoMovement() {
 				roambox_max_y,
 				roambox_destination_y);
 			Log(Logs::Detail, Logs::NPCRoamBox, "Dest Z is (%f)", roambox_destination_z);
-
+			
 			SetCurrentWP(EQEmu::WaypointStatus::RoamBoxPauseInProgress);
 			NavigateTo(roambox_destination_x, roambox_destination_y, roambox_destination_z);
 		}
