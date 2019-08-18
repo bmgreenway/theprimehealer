@@ -2005,9 +2005,9 @@ void WorldServer::HandleMessage(uint16 opcode, const EQ::Net::Packet &p)
 		auto client = entity_list.GetClientByName(name);
 		if (client) {
 			if (message == 0)
-				client->Message(13, "Shared task assignment has failed.");
+				client->Message(Chat::Red, "Shared task assignment has failed.");
 			else if (message > 0)
-				client->Message_StringID(13, message);
+				client->MessageString(Chat::Red, message);
 			// negative nothing I guess
 		}
 		break;

@@ -3730,29 +3730,29 @@ void ClientTaskState::AcceptNewTask(Client *c, int TaskID, int NPCID, bool enfor
 void ClientTaskState::RequestSharedTask(Client *c, int TaskID, int NPCID, bool enforce_level_requirement)
 {
 	if (!taskmanager || TaskID < 0 || TaskID >= MAXTASKS) {
-		c->Message(13, "Task system not functioning, or TaskID %i out of range.", TaskID);
+		c->Message(Chat::Red, "Task system not functioning, or TaskID %i out of range.", TaskID);
 		return;
 	}
 
 	auto task = taskmanager->Tasks[TaskID];
 
 	if (task == nullptr) {
-		c->Message(13, "Invalid TaskID %i", TaskID);
+		c->Message(Chat::Red, "Invalid TaskID %i", TaskID);
 		return;
 	}
 
 	if (task->type != TaskType::Shared) {
-		c->Message(13, "Trying to shared task a non shared task %i", TaskID);
+		c->Message(Chat::Red, "Trying to shared task a non shared task %i", TaskID);
 		return;
 	}
 
 	if (ActiveSharedTask != nullptr) {
-		c->Message_StringID(13, TASK_REJECT_HAVE_ONE);
+		c->MessageString(Chat::Red, TASK_REJECT_HAVE_ONE);
 		return;
 	}
 
 	if (enforce_level_requirement && !taskmanager->AppropriateLevel(TaskID, c->GetLevel())) {
-		c->Message(13, "You are outside the level range of this task.");
+		c->Message(Chat::Red, "You are outside the level range of this task.");
 		return;
 	}
 
@@ -3767,7 +3767,7 @@ void ClientTaskState::RequestSharedTask(Client *c, int TaskID, int NPCID, bool e
 			std::string hours = std::to_string(expires / 3600);
 			expires = expires % 3600;
 			std::string minutes = std::to_string(expires / 60);
-			c->Message_StringID(13, TASK_REJECT_LOCKEDOUT, days.c_str(), hours.c_str(), minutes.c_str());
+			c->MessageString(Chat::Red, TASK_REJECT_LOCKEDOUT, days.c_str(), hours.c_str(), minutes.c_str());
 			return;
 		}
 	}
@@ -3786,9 +3786,9 @@ void ClientTaskState::RequestSharedTask(Client *c, int TaskID, int NPCID, bool e
 
 	if (!EQEmu::ValueWithin(player_count, task->min_players, task->max_players)) {
 		if (player_count < task->min_players)
-			c->Message_StringID(13, TASK_REJECT_MIN_COUNT);
+			c->MessageString(Chat::Red, TASK_REJECT_MIN_COUNT);
 		else
-			c->Message_StringID(13, TASK_REJECT_MAX_COUNT);
+			c->MessageString(Chat::Red, TASK_REJECT_MAX_COUNT);
 		return;
 	}
 
@@ -3878,8 +3878,8 @@ void ClientTaskState::AcceptNewSharedTask(Client *c, int TaskID, int NPCID, int 
 	std::string buf = std::to_string(TaskID);
 	NPC *npc = entity_list.GetID(NPCID)->CastToNPC();
 	if(!npc) {
-		c->Message(clientMessageYellow, "Task Giver ID is %i", NPCID);
-		c->Message(clientMessageError, "Unable to find NPC to send EVENT_TASKACCEPTED to. Report this bug.");
+		c->Message(Chat::Yellow, "Task Giver ID is %i", NPCID);
+		c->Message(Chat::Red, "Unable to find NPC to send EVENT_TASKACCEPTED to. Report this bug.");
 		// TODO: ahh do we wanna do this? clean up world at least
 		return;
 	}
@@ -4154,7 +4154,7 @@ void SharedTaskState::LockTask()
 
 	for (auto & m : members)
 		if (m.entity != nullptr)
-			m.entity->Message_StringID(CC_Yellow, SHARED_TASK_LOCK);
+			m.entity->MessageString(Chat::Yellow, SHARED_TASK_LOCK);
 }
 
 void SharedTaskState::MemberZoned(Mob *player)
