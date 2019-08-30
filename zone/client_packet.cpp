@@ -3969,6 +3969,9 @@ void Client::Handle_OP_Camp(const EQApplicationPacket *app)
 #ifdef BOTS
 	// This block is necessary to clean up any bot objects owned by a Client
 	Bot::BotOrderCampAll(this);
+	auto group = GetGroup();
+	if (group && group->GroupCount() < 2)
+		group->DisbandGroup();
 #endif
 	if (IsLFP())
 		worldserver.StopLFP(CharacterID());
